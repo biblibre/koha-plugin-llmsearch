@@ -5,7 +5,7 @@ $(document).ready(function() {
         .then(response => response.text())
         .then(html => {
             $('body').append(html);
-	    populateChat();
+            populateChat();
             $('form.chat-container').on('submit', function(event) {
                 event.preventDefault();
                 askAI();

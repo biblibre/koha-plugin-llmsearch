@@ -8,8 +8,10 @@ use base qw(Koha::Plugins::Base);
 use Template;
 use Mojo::JSON qw(decode_json);
 
+use Koha::DateUtils qw( dt_from_string );
+
 ## Here we set our plugin version
-our $VERSION = "1";
+our $VERSION = "1.2";
 our $MINIMUM_VERSION = "23.11";
 
 ## Here is our metadata, some keys are required, some are optional
@@ -17,7 +19,7 @@ our $metadata = {
     name            => 'LLM Search',
     author          => 'A. Suzuki',
     date_authored   => '2025-05-26',
-    date_updated    => "2025-05-26",
+    date_updated    => "2026-09-23",
     minimum_version => $MINIMUM_VERSION,
     maximum_version => undef,
     version         => $VERSION,
@@ -81,10 +83,10 @@ sub configure {
                      model                    => 'mistral-small-latest',
                      welcome                  => $default_welcome,
                      system_prompt            => '',
-                     only_logged              => 1,
+                     is_public                => 0,
                      allowed_cat              => '',
                      enable_stats             => 0,
-                     max_tool_rounds          => 3,
+                     max_tool_rounds          => 5,
                      debug_mode               => 0,
     };
 
@@ -92,7 +94,7 @@ sub configure {
         my $template = $self->get_template({ file => 'configure.tt' });
         foreach my $key (keys %$defaults) {
             my $param_value = $self->retrieve_data($key);
-            if (defined $param_value && $param_value ne '') {
+            if (defined $param_value) {
                 $template->param($key => $param_value);
             }
             else {
@@ -105,7 +107,7 @@ sub configure {
         my $config = { %$defaults };
         foreach my $key (keys %$defaults) {
             my $param_value = $cgi->param($key);
-            if (defined $param_value && $param_value ne '') {
+            if (defined $param_value) {
                 $config->{$key} = $param_value;
             }
         }
@@ -117,23 +119,17 @@ sub configure {
 
 sub is_allowed {
     my ( $self ) = @_;
-    my $only_logged = $self->retrieve_data('only_logged');
-
-    return 1
-        if $only_logged eq '0';
+    return 1 if $self->retrieve_data('is_public') eq 'on';
+    
+    my $borrowernumber = C4::Context->userenv->{'number'} // 0;
+    return 0 unless $borrowernumber;
 
     my $allowed_cat = $self->retrieve_data('allowed_cat');
-    return 1
-        unless $allowed_cat;
-
-    my $borrowernumber = C4::Context->userenv->{'number'} // 0;
-    return 0
-        unless $borrowernumber;
+    return 1 unless $allowed_cat;
 
     my $patron = Koha::Patrons->find($borrowernumber)->unblessed();
     foreach my $category (split(' ', $allowed_cat)) {
-        return 1
-            if $category eq $patron->{categorycode};
+        return 1 if $category eq $patron->{categorycode};
     }
 
     return 0;
@@ -141,16 +137,18 @@ sub is_allowed {
 
 sub opac_js {
     my ( $self ) = @_;
+    warn "is_allowed: " . $self->is_allowed();
+    return '' unless $self->is_allowed();
     return '<script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>'
         . '<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>'
-        . '<script>' . $self->mbf_read('chat.js') . '</script>'
-        if $self->is_allowed();
+        . '<script>' . $self->mbf_read('chat.js') . '</script>';
 }
 
 sub opac_head {
     my ( $self ) = @_;
-    return '<style>' . $self->mbf_read('chat.css') . '</style>'
-        if $self->is_allowed();
+    warn "is_allowed: " . $self->is_allowed();
+    return '' unless $self->is_allowed();
+    return '<style>' . $self->mbf_read('chat.css') . '</style>';
 }
 
 sub api_routes {

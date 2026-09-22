@@ -56,7 +56,7 @@ sub chat {
     my $prompt   = $plugin->retrieve_data('system_prompt') || $plugin->mbf_read('system_prompt.txt');
     # Inject the live index list from Koha's search_field table
     $prompt =~ s/\{\{SEARCH_INDEXES\}\}/_build_index_list_text()/e;
-    my $max_tool_rounds = $plugin->retrieve_data('max_tool_rounds') // 3;
+    my $max_tool_rounds = $plugin->retrieve_data('max_tool_rounds') // 5;
     $max_tool_rounds = 1 if $max_tool_rounds < 1;
 
     return $c->render(
@@ -538,5 +538,7 @@ sub log_request {
 
     return $dbh->do($query);
 }
+
+
 
 1;

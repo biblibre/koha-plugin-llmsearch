@@ -11,7 +11,7 @@
 
 <div id="doc3">
     <h3>LLMSearch: Configuration</h3>
-    	<form method="get">
+    	<form method="post">
         <input type="hidden" name="class" value="[% CLASS %]"/>
         <input type="hidden" name="method" value="[% METHOD %]"/>
 	[% INCLUDE 'csrf-token.inc' %]
@@ -51,11 +51,11 @@
 	    <input type="text" name="base_url" value="[% base_url %]"/>
 	</div>
 	<div>
-	    <label for="only_logged">Optional : Only show to logged-in users</label>
-	    <input type="checkbox" name="only_logged" [% IF ( only_logged ) %]checked="checked"[% END %]/>
+	    <label for="is_public">allow anonymous users (always available)</label>
+	    <input type="checkbox" name="is_public" [% IF ( is_public ) %]checked="checked"[% END %]/>
 	</div>
 	<div>
-	    <label for="allowed_cat">Allowed category codes, separated with space</label>
+	    <label for="allowed_cat">only allow specific category codes, separated with space</label>
 	    <input type="text" name="allowed_cat" value="[% allowed_cat %]"/>
 	</div>
 	<div>
