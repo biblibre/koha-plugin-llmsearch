@@ -38,36 +38,54 @@ function askAI() {
     addMessage('assistant', '<div class="loading-dots"><span>.</span><span>.</span><span>.</span></div>', 0);
 
     chatWindow.scrollTop(chatWindow[0].scrollHeight);
-    $.post('/api/v1/contrib/llmsearch/chat', { json : sessionStorage.getItem('current_chat') }, function(data) {
-        if (data._debug_log) {
-            console.group('[LLMSearch] Debug log');
-            data._debug_log.forEach(function(entryStr) {
-                var entry = (typeof entryStr === 'string') ? JSON.parse(entryStr) : entryStr;
-                if (entry.request)   { console.group('Round ' + entry.round + ' [Request]');  console.log(entry.request);  console.groupEnd(); }
-                if (entry.response)  { console.group('Round ' + entry.round + ' [Response]'); console.log(entry.response); console.groupEnd(); }
-                if (entry.tool_call) { console.group('Round ' + entry.round + ' [tool] ' + entry.tool_call); console.log('Args:', entry.arguments); console.log('Result:', entry.tool_result); console.groupEnd(); }
-            });
-            console.groupEnd();
+    
+    $.ajax({
+        url: '/api/v1/contrib/llmsearch/chat',
+        type: 'POST',
+        data: { json: sessionStorage.getItem('current_chat') },
+        dataType: 'text',
+        success: function(jsonText) {
+            try {
+                // Parser explicitement le JSON
+                var data = JSON.parse(jsonText);
+                
+                if (data._debug_log) {
+                    console.group('[LLMSearch] Debug log');
+                    data._debug_log.forEach(function(entryStr) {
+                        var entry = (typeof entryStr === 'string') ? JSON.parse(entryStr) : entryStr;
+                        if (entry.request)   { console.group('Round ' + entry.round + ' [Request]');  console.log(entry.request);  console.groupEnd(); }
+                        if (entry.response)  { console.group('Round ' + entry.round + ' [Response]'); console.log(entry.response); console.groupEnd(); }
+                        if (entry.tool_call) { console.group('Round ' + entry.round + ' [tool] ' + entry.tool_call); console.log('Args:', entry.arguments); console.log('Result:', entry.tool_result); console.groupEnd(); }
+                    });
+                    console.groupEnd();
+                }
+                
+                if (data.choices && data.choices.length > 0) {
+                    const content = preprocessContent(data.choices[0].message.content);
+                    const clean = DOMPurify.sanitize(content);
+                    $('div.chat-messages div.assistant:last p').html(clean);
+                    saveMessage('assistant', clean);
+                    chatWindow.scrollTop(chatWindow[0].scrollHeight);
+                }
+            } catch (e) {
+                console.error('Error parsing JSON:', e);
+                alert('Error processing response. Check console.');
+            }
+        },
+        error: function() {
+            alert("AJAX error, check the plugin configuration or javascript console");
         }
-        if (data.choices && data.choices.length > 0) {
-            const content = preprocessContent(data.choices[0].message.content);
-	    const clean = DOMPurify.sanitize(content);
-            $('div.chat-messages div.assistant:last p').html(clean);
-	    saveMessage('assistant', clean);
-            chatWindow.scrollTop(chatWindow[0].scrollHeight);
-        }
-    }).fail(function() {
-	alert( "AJAX error, check the plugin configuration or javascript console" );
     });
 }
 
 function addMessage(role, content, save=1) {
-    icon = role == 'assistant' ? 'robot' : 'user' ;
+    var iconName = role == 'assistant' ? 'robot' : 'user';
     var messageDiv = $('<div>', { 'class': 'message ' + role });
 
-    var icon = $('<i>', { 'class': 'fa-solid fa-' + icon });
+    var icon = $('<i>', { 'class': 'fa-solid fa-' + iconName });
 
-    var paragraph = $('<p>').html( content );
+    // Utiliser .html() pour préserver les balises et l'encodage UTF-8
+    var paragraph = $('<p>').html(content);
     messageDiv.append(icon);
     messageDiv.append(paragraph);
     $('div.chat-messages').append(messageDiv);

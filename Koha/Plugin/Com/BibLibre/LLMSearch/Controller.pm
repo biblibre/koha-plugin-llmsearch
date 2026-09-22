@@ -19,9 +19,12 @@ our $plugin = Koha::Plugin::Com::BibLibre::LLMSearch->new();
 
 sub welcome {
     my $c = shift->openapi->valid_input or return;
+    my $welcome_msg = $plugin->retrieve_data('welcome');
+    utf8::encode($welcome_msg) if defined $welcome_msg;
     return $c->render(
         status  => 200,
-        openapi => $plugin->retrieve_data('welcome'),
+        openapi => $welcome_msg,
+        charset => 'UTF-8'
     );
 }
 
@@ -68,9 +71,7 @@ sub chat {
     $json = uri_unescape($json);
     my $previous_chat;
     if ( $json =~ /json=(.*)/ ) {
-        # $1 is a Perl Unicode string (UTF-8 flag set); decode_json expects
-        # raw UTF-8 octets, so we re-encode before parsing.
-        $previous_chat = decode_json( encode('UTF-8', $1) );
+        $previous_chat = decode_json($1);
     }
 
     my @messages = ( { "role" => "system", "content" => $prompt } );
@@ -108,7 +109,8 @@ sub chat {
             );
         }
 
-        my $response_data = decode_json( encode('UTF-8', $http_response->decoded_content(charset => 'UTF-8')) );
+        my $content = $http_response->decoded_content;
+        my $response_data = decode_json($content);
         my $choice        = $response_data->{choices}[0];
 
         if ( $debug_mode ) {
@@ -184,7 +186,8 @@ sub chat {
         my $fallback_http = _call_llm( $user_agent, $base_url, $api_key, $fallback_payload );
 
         if ( $fallback_http->is_success ) {
-            $final_response = decode_json( encode('UTF-8', $fallback_http->decoded_content(charset => 'UTF-8')) );
+            my $fallback_content = $fallback_http->decoded_content;
+            $final_response = decode_json($fallback_content);
         }
         else {
             # Ultimate fallback if even this call fails
@@ -208,9 +211,13 @@ sub chat {
     $final_response->{_debug_log} = \@debug_log if $debug_mode && @debug_log;
 
     log_request( { lang => $opac_lang, data => $final_response } );
+    
+    # Laisser Mojolicious gérer l'encodage UTF-8 avec openapi
     return $c->render(
         status  => 200,
-        openapi => $final_response
+        openapi => $final_response,
+        format  => 'json',
+        charset => 'UTF-8'
     );
 }
 
