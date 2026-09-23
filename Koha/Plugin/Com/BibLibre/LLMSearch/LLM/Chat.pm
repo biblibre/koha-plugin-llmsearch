@@ -5,6 +5,7 @@ use C4::Context;
 use C4::Auth qw( get_session );
 use JSON qw( encode_json decode_json );
 use URI::Escape;
+use Encode qw(encode);
 use Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Client;
 use Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Prompt;
 use Koha::Plugin::Com::BibLibre::LLMSearch::Search::Tools;
