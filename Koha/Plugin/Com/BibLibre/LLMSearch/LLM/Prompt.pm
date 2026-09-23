@@ -22,22 +22,12 @@ embedded system_prompt.txt file, and injects the live search indexes.
 =cut
 
 sub get_system_prompt {
-    my ($plugin, $custom_prompt) = @_;
-    
+    my ($plugin) = @_;
     # Use custom prompt if provided (non-empty), otherwise get from plugin config or default file
-    my $prompt;
-    if (defined $custom_prompt && $custom_prompt ne '') {
-        $prompt = $custom_prompt;
-    } else {
-        $prompt = $plugin->retrieve_data('system_prompt') // $plugin->mbf_read('system_prompt.txt');
-    }
-    
-    # Ensure we have a non-empty prompt - fallback to default if undefined or empty
-    $prompt = get_fallback_message() unless defined $prompt && $prompt ne '';
-    
+    my $prompt = $plugin->retrieve_data('system_prompt');
+    $prompt = $plugin->mbf_read('system_prompt.txt') if $prompt eq '';
     # Inject the live index list from Koha's search_field table
     $prompt =~ s/\{\{SEARCH_INDEXES\}\}/build_index_list_text()/e;
-    
     return $prompt;
 }
 
