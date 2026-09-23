@@ -157,4 +157,21 @@ is($result2->{error}, 'field_name parameter is required', '_execute_get_authorit
 my $result3 = Koha::Plugin::Com::BibLibre::LLMSearch::Controller::_execute_get_authority({ field_name => 'author' });
 is($result3->{error}, 'value parameter is required', '_execute_get_authority requires value');
 
+# 10. Test log_request with missing args
+# Note: This function requires database access, so we test it doesn't crash with various inputs
+# and that it returns 1 when enable_stats is disabled
+my $log_result = Koha::Plugin::Com::BibLibre::LLMSearch::Controller::log_request({});
+is($log_result, 1, 'log_request returns 1 when enable_stats is disabled');
+
+# Test with partial args - should not crash
+$log_result = Koha::Plugin::Com::BibLibre::LLMSearch::Controller::log_request({ lang => 'fr' });
+is($log_result, 1, 'log_request returns 1 with partial args when enable_stats is disabled');
+
+# Test with full args - should not crash even if userenv is not available
+$log_result = Koha::Plugin::Com::BibLibre::LLMSearch::Controller::log_request({
+    lang => 'fr',
+    data => { usage => { prompt_tokens => 10, completion_tokens => 20 } }
+});
+is($log_result, 1, 'log_request returns 1 with full args when enable_stats is disabled');
+
 done_testing();

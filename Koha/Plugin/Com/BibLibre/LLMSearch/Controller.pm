@@ -571,20 +571,27 @@ sub log_request {
 
     return 1 unless ( $plugin->retrieve_data('enable_stats') );
 
-    my $userenv = C4::Context->userenv;
-    my $patron  = Koha::Patrons->find( $userenv->{'number'} )->unblessed();
-
     my $dbh   = C4::Context->dbh;
     my $table = $plugin->get_qualified_table_name('stats');
+
+    my $userenv = C4::Context->userenv;
+    my $patron;
+    if ($userenv && $userenv->{'number'}) {
+        $patron = Koha::Patrons->find( $userenv->{'number'} );
+        $patron = $patron->unblessed() if $patron;
+    }
+
+    my $prompt_tokens = $response->{usage}{prompt_tokens} // 0;
+    my $completion_tokens = $response->{usage}{completion_tokens} // 0;
 
     my $query = "INSERT INTO $table (
                      opac_lang,
                      tokens_sent,
                      tokens_received
                  ) VALUES (
-                     '$opac_lang',
-                     '$response->{usage}{prompt_tokens}',
-                     '$response->{usage}{completion_tokens}'
+                     " . $dbh->quote($opac_lang) . ",
+                     $prompt_tokens,
+                     $completion_tokens
                  )";
 
     return $dbh->do($query) unless $patron;
@@ -603,15 +610,15 @@ sub log_request {
             tokens_sent,
             tokens_received
         ) VALUES (
-            '$patron->{categorycode}',
-            '$patron->{branchcode}',
-            '$enrolledyear',
-            '$birthyear',
-            '$patron->{sort1}',
-            '$patron->{sort2}',
-            '$opac_lang',
-            '$response->{usage}{prompt_tokens}',
-            '$response->{usage}{completion_tokens}'
+            " . $dbh->quote($patron->{categorycode} // '') . ",
+            " . $dbh->quote($patron->{branchcode} // '') . ",
+            " . $dbh->quote($enrolledyear) . ",
+            " . $dbh->quote($birthyear) . ",
+            " . $dbh->quote($patron->{sort1} // '') . ",
+            " . $dbh->quote($patron->{sort2} // '') . ",
+            " . $dbh->quote($opac_lang) . ",
+            $prompt_tokens,
+            $completion_tokens
         )";
 
     return $dbh->do($query);
