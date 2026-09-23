@@ -16,7 +16,6 @@ use HTTP::Response;
 
 our $plugin = Koha::Plugin::Com::BibLibre::LLMSearch->new();
 
-
 sub welcome {
     my $c = shift->openapi->valid_input or return;
     my $welcome_msg = $plugin->retrieve_data('welcome');
@@ -137,6 +136,9 @@ sub chat {
                 }
                 elsif ( $fn_name eq 'get_authorized_values' ) {
                     $result = _execute_get_authorized_values($fn_args);
+                }
+                elsif ( $fn_name eq 'get_authority' ) {
+                    $result = _execute_get_authority($fn_args);
                 }
                 else {
                     $result = { error => "Unknown tool: $fn_name" };
@@ -348,6 +350,31 @@ sub _get_search_tools {
                 },
             },
         },
+        {
+            type     => 'function',
+            function => {
+                name        => 'get_authority',
+                description =>
+                    'Check if an authority exists using Koha\'s authority search system. '
+                    . 'Call this when a field description says "[authority field]" '
+                    . 'to verify that the authority value exists before searching. '
+                    . 'Returns: exists (bool), authid, count, and heading if found.',
+                parameters => {
+                    type       => 'object',
+                    properties => {
+                        field_name => {
+                            type        => 'string',
+                            description => 'The search field name (e.g. "author", "subject")',
+                        },
+                        value => {
+                            type        => 'string',
+                            description => 'The authority value to check',
+                        },
+                    },
+                    required => ['field_name', 'value'],
+                },
+            },
+        },
     ];
 }
 
@@ -484,6 +511,56 @@ sub _execute_get_authorized_values {
     }
 
     return { category => $category, values => \@values };
+}
+
+# -------------------------------------------------------------------------
+# _execute_get_authority( \%params ) -> { exists => bool, authid => int or undef, count => int }
+# Checks if an authority exists in the database for a given search field.
+# Uses Koha::SearchEngine::Search->search_auth_compat for proper authority search.
+# -------------------------------------------------------------------------
+sub _execute_get_authority {
+    my ($params) = @_;
+
+    my $field_name = $params->{field_name};
+    my $value      = $params->{value};
+
+    return { error => 'field_name parameter is required' }
+        unless $field_name;
+    return { error => 'value parameter is required' }
+        unless defined $value;
+
+    # Use Koha::SearchEngine::Search->search_auth_compat for proper authority search
+    # search_auth_compat uses C4::AuthoritiesMarc::SearchAuthorities internally
+    eval {
+        require Koha::SearchEngine::Search;
+        
+        my $searcher = Koha::SearchEngine::Search->new;
+        
+        # Build query parameters for search_auth_compat
+        # It expects: marclist, and_or, excluding, operator, value, authtypecode, orderby
+        my $query_params = { value => [$value] };
+        my ( $error, $results, $total_hits ) =
+            $searcher->search_auth_compat( $query_params, 0, 1, 1 );
+
+        if ($error) {
+            warn "LLMSearch: Authority search error: $error";
+            return { exists => 0, count => 0, error => $error };
+        }
+
+        if ($results && ref $results eq 'ARRAY' && @$results) {
+            # Return first match information
+            my $first = $results->[0];
+            return {
+                exists  => 1,
+                authid  => $first->{authid},
+                count   => scalar(@$results),
+                heading => $first->{heading},
+            };
+        }
+        else {
+            return { exists => 0, count => 0 };
+        }
+    };
 }
 
 sub log_request {

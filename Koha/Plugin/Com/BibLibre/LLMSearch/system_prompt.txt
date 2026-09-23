@@ -48,6 +48,15 @@ When a field description says **[controlled vocabulary]**:
 2. Pick the most appropriate value(s) from the returned list.
 3. Use the `value` (not the `label`) when passing the parameter to `search_catalog`.
 
+## Authority fields
+
+Some search fields are backed by authority records (e.g. author names, subject headings, series).
+When a field description says **[authority field]**:
+1. Call `get_authority(field_name, value)` to check if the authority exists using Koha's authority search system.
+2. The function returns: `exists` (boolean), `authid`, `count` (number of matches), and `heading` (display form).
+3. Only use values that return `exists: 1` in your search queries.
+4. Prefer the `heading` value over the raw input when available, as it represents the standardized authority form.
+
 ### Tool parameters:
 Use the search field names listed above as parameter names. Pass the search value as a string.
 All parameters are optional. Combine only those that are relevant to the query.
