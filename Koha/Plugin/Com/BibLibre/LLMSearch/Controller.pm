@@ -193,7 +193,7 @@ sub chat {
 
         # No tools in this call — the LLM must produce a plain stop response
         my $fallback_payload = { model => $model, messages => [@messages] };
-        my $fallback_http = _call_llm( $user_agent, $base_url, $api_key, $fallback_payload );
+        my $fallback_http = Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Client::call( $user_agent, $base_url, $api_key, $fallback_payload );
 
         if ( $fallback_http->is_success ) {
             my $fallback_content = $fallback_http->decoded_content;
