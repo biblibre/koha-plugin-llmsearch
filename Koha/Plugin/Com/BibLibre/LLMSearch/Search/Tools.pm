@@ -2,6 +2,8 @@ package Koha::Plugin::Com::BibLibre::LLMSearch::Search::Tools;
 
 use Modern::Perl;
 use C4::Context;
+use Koha::Plugin::Com::BibLibre::LLMSearch::Search::CCL;
+use Koha::Plugin::Com::BibLibre::LLMSearch::Search::Fields;
 
 =head1 NAME
 
