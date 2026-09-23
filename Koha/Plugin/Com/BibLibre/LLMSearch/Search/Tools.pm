@@ -196,7 +196,7 @@ sub execute_get_authority {
     return { error => 'field_name parameter is required' }
         unless $field_name;
     return { error => 'value parameter is required' }
-        unless defined $value;
+        unless defined $value && $value ne '';
 
     # Use Koha::SearchEngine::Search->search_auth_compat for proper authority search
     # search_auth_compat uses C4::AuthoritiesMarc::SearchAuthorities internally

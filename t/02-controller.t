@@ -295,7 +295,7 @@ is($result_empty->{error}, 'field_name parameter is required', 'Tools::execute_g
 
 # Test execute_get_authority with empty value
 my $result_empty_value = Koha::Plugin::Com::BibLibre::LLMSearch::Search::Tools::execute_get_authority({ field_name => 'author', value => '' });
-ok($result_empty_value->{exists} == 0, 'Tools::execute_get_authority returns exists=0 for empty value');
+is($result_empty_value->{error}, 'value parameter is required', 'Tools::execute_get_authority rejects empty value');
 
 # Test execute_get_authority with undef value
 my $result_undef_value = Koha::Plugin::Com::BibLibre::LLMSearch::Search::Tools::execute_get_authority({ field_name => 'author', value => undef });
