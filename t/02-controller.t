@@ -304,15 +304,15 @@ is($result_undef_value->{error}, 'value parameter is required', 'Tools::execute_
 # Prompt module edge cases
 # Test get_system_prompt with empty custom prompt
 my $empty_prompt = Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Prompt::get_system_prompt($plugin, '');
-ok(defined $empty_prompt && $empty_prompt ne '', 'Prompt::get_system_prompt handles empty custom prompt');
+ok($empty_prompt, 'Prompt::get_system_prompt handles empty custom prompt');
 
 # Test get_system_prompt with undef custom prompt
 my $undef_prompt = Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Prompt::get_system_prompt($plugin, undef);
-ok(defined $undef_prompt && $undef_prompt ne '', 'Prompt::get_system_prompt handles undef custom prompt');
+ok($undef_prompt, 'Prompt::get_system_prompt handles undef custom prompt');
 
 # Test get_system_prompt with whitespace-only custom prompt
 my $whitespace_prompt = Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Prompt::get_system_prompt($plugin, '   ');
-ok(defined $whitespace_prompt && $whitespace_prompt ne '', 'Prompt::get_system_prompt handles whitespace-only custom prompt');
+ok($whitespace_prompt, 'Prompt::get_system_prompt handles whitespace-only custom prompt');
 
 # Test get_fallback_response structure
 my $fallback = Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Prompt::get_fallback_response();

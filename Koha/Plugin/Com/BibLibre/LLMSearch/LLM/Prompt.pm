@@ -32,8 +32,8 @@ sub get_system_prompt {
         $prompt = $plugin->retrieve_data('system_prompt') // $plugin->mbf_read('system_prompt.txt');
     }
     
-    # Ensure we have a prompt - fallback to default if still undefined
-    $prompt //= get_fallback_message();
+    # Ensure we have a non-empty prompt - fallback to default if undefined or empty
+    $prompt = get_fallback_message() unless defined $prompt && $prompt ne '';
     
     # Inject the live index list from Koha's search_field table
     $prompt =~ s/\{\{SEARCH_INDEXES\}\}/build_index_list_text()/e;
