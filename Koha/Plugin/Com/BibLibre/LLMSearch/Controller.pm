@@ -133,6 +133,7 @@ sub chat {
 
                 if ( $fn_name eq 'search_catalog' ) {
                     $result = _execute_search($fn_args);
+		    $max_tool_rounds = $round + 1 if $result->{'count'} ge 1;
                 }
                 elsif ( $fn_name eq 'get_authorized_values' ) {
                     $result = _execute_get_authorized_values($fn_args);
