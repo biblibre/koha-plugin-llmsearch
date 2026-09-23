@@ -242,6 +242,9 @@ sub execute_tool_calls {
         elsif ( $fn_name eq 'get_authority' ) {
             $result = Koha::Plugin::Com::BibLibre::LLMSearch::Search::Tools::execute_get_authority($fn_args);
         }
+	elsif ( $fn_name eq 'get_search_indexes' ) {
+	    $result = Koha::Plugin::Com::BibLibre::LLMSearch::Search::Tools::execute_get_search_indexes();
+	}
         else {
             $result = { error => "Unknown tool: $fn_name" };
         }

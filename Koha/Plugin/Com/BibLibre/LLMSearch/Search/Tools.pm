@@ -24,38 +24,10 @@ with parameters built dynamically from Koha's live search field list.
 =cut
 
 sub get_search_tools {
-    my $fields = Koha::Plugin::Com::BibLibre::LLMSearch::Search::Fields::get_opac_biblio_search_fields();
-
-    my %properties;
-    for my $field (@$fields) {
-        my $desc = $field->{label};
-        # For date fields, add CCL date-range syntax instructions
-        if ( $field->{name} =~ /date/i ) {
-            $desc .= '. Use CCL date range syntax (no quotes, no < or > signs): '
-                   . 'exact year -> "2005"; '
-                   . 'range -> "2005-2014"; '
-                   . 'before 2005 (i.e. up to 2004) -> "-2004"; '
-                   . 'from 2005 onwards -> "2005-".';
-        }
-        # Flag fields backed by authorized values
-        if ( Koha::Plugin::Com::BibLibre::LLMSearch::Search::Fields::get_field_av_category( $field->{name} ) ) {
-            $desc .= ' [controlled vocabulary -- call get_authorized_values("'
-                   . $field->{name}
-                   . '") to get the list of valid values before searching]';
-        }
-        $properties{ $field->{name} } = {
-            type        => 'string',
-            description => $desc,
-        };
-    }
-
-    # Safety net: if no fields are configured yet, expose a generic keyword param
-    unless (%properties) {
-        %properties = (
-            keyword => { type => 'string', description => 'General keyword search' },
-        );
-    }
-
+    # Note: We no longer include field definitions here to avoid sending
+    # the full field list with every LLM call. Instead, the LLM should use
+    # the get_search_indexes tool to discover available fields.
+    
     return [
         {
             type     => 'function',
@@ -64,10 +36,11 @@ sub get_search_tools {
                 description =>
                     'Search the library catalog and return the number of matching results. '
                     . 'Call this tool to verify that a search will return results BEFORE including a link in your response. '
-                    . 'If the count is 0, adjust the criteria (broader terms, fewer constraints, synonyms) and try again.',
+                    . 'If the count is 0, adjust the criteria (broader terms, fewer constraints, synonyms) and try again. '
+                    . 'Use field names obtained from the get_search_indexes tool. Pass parameters as fieldname: value pairs.',
                 parameters => {
                     type       => 'object',
-                    properties => \%properties,
+                    properties => {},
                     required   => [],
                 },
             },
@@ -114,6 +87,21 @@ sub get_search_tools {
                         },
                     },
                     required => ['field_name', 'value'],
+                },
+            },
+        },
+        {
+            type     => 'function',
+            function => {
+                name        => 'get_search_indexes',
+                description =>
+                    'Get the list of available search indexes for the catalog. '
+                    . 'Call this tool when you need to know which fields are available for searching. '
+                    . 'Returns: indexes (array of objects with name and label properties).',
+                parameters => {
+                    type       => 'object',
+                    properties => {},
+                    required   => [],
                 },
             },
         },
@@ -180,6 +168,49 @@ sub execute_get_authorized_values {
     }
 
     return { category => $category, values => \@values };
+}
+
+=head2 execute_get_search_indexes
+
+Returns the list of available search indexes for the catalog.
+This is a lightweight tool that returns just the field names and labels,
+without consuming tokens in the system prompt.
+
+=cut
+
+sub execute_get_search_indexes {
+    my ($params) = @_;  # No parameters needed
+
+    my $fields = Koha::Plugin::Com::BibLibre::LLMSearch::Search::Fields::get_opac_biblio_search_fields();
+
+    my @indexes;
+    for my $field (@$fields) {
+        my $desc = $field->{label};
+        
+        # Add CCL date-range syntax instructions for date fields
+        if ( $field->{name} =~ /date/i ) {
+            $desc .= '. Use CCL date range syntax (no quotes, no < or > signs): '
+                   . 'exact year -> "2005"; '
+                   . 'range -> "2005-2014"; '
+                   . 'before 2005 (i.e. up to 2004) -> "-2004"; '
+                   . 'from 2005 onwards -> "2005-".';
+        }
+        
+        # Flag fields backed by authorized values
+        if ( my $category = Koha::Plugin::Com::BibLibre::LLMSearch::Search::Fields::get_field_av_category( $field->{name} ) ) {
+            $desc .= ' [controlled vocabulary -- call get_authorized_values("'
+                   . $field->{name}
+                   . '") to get the list of valid values before searching]';
+        }
+        
+        push @indexes, {
+            name => $field->{name},
+            label => $field->{label},
+            description => $desc,
+        };
+    }
+
+    return { indexes => \@indexes };
 }
 
 =head2 execute_get_authority

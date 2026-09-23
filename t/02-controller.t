@@ -141,6 +141,7 @@ my %tool_names = map { $_->{function}{name} => 1 } @$tools;
 ok(exists $tool_names{'search_catalog'}, 'Tools::get_search_tools includes search_catalog');
 ok(exists $tool_names{'get_authorized_values'}, 'Tools::get_search_tools includes get_authorized_values');
 ok(exists $tool_names{'get_authority'}, 'Tools::get_search_tools includes get_authority');
+ok(exists $tool_names{'get_search_indexes'}, 'Tools::get_search_tools includes get_search_indexes');
 
 # 6. Test Fields::get_field_av_category
 # This requires database access, so we just verify it exists and doesn't crash
@@ -194,18 +195,17 @@ ok(exists $fallback_resp->{choices}, 'Prompt::get_fallback_response has choices'
 ok(exists $fallback_resp->{usage}, 'Prompt::get_fallback_response has usage');
 ok(ref($fallback_resp->{choices}) eq 'ARRAY', 'Prompt::get_fallback_response choices is array');
 
-# Test build_index_list_text (wrapper)
+# Test build_index_list_text (wrapper) - still exists for backward compatibility
+# Note: This function is no longer used in the system prompt but kept for compatibility
 my $index_text = Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Prompt::build_index_list_text();
 ok($index_text, 'Prompt::build_index_list_text returns a string');
 
 # Test get_system_prompt with custom prompt
 use Koha::Plugin::Com::BibLibre::LLMSearch;
 my $plugin = Koha::Plugin::Com::BibLibre::LLMSearch->new();
-my $custom_prompt = "You are a helpful assistant. {{SEARCH_INDEXES}}";
+my $custom_prompt = "You are a helpful assistant.";
 my $processed_prompt = Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Prompt::get_system_prompt($plugin, $custom_prompt);
 ok($processed_prompt, 'Prompt::get_system_prompt returns a prompt');
-# The SEARCH_INDEXES placeholder should be replaced with actual index list
-ok(length($processed_prompt) > length($custom_prompt), 'Prompt::get_system_prompt injects index list');
 
 # 12. Test LLM::Chat module
 # Test that the module loads
@@ -289,6 +289,20 @@ ok(
 );
 
 # Tools module edge cases
+# Test execute_get_search_indexes
+my $indexes_result = Koha::Plugin::Com::BibLibre::LLMSearch::Search::Tools::execute_get_search_indexes({});
+ok($indexes_result, 'Tools::execute_get_search_indexes returns result');
+ok(exists $indexes_result->{indexes}, 'Tools::execute_get_search_indexes returns indexes array');
+ok(ref($indexes_result->{indexes}) eq 'ARRAY', 'Tools::execute_get_search_indexes indexes is array');
+
+# Verify that indexes have the expected structure
+if (@{$indexes_result->{indexes}}) {
+    my $first_index = $indexes_result->{indexes}[0];
+    ok(exists $first_index->{name}, 'Tools::execute_get_search_indexes first index has name');
+    ok(exists $first_index->{label}, 'Tools::execute_get_search_indexes first index has label');
+    ok(exists $first_index->{description}, 'Tools::execute_get_search_indexes first index has description');
+}
+
 # Test execute_get_authorized_values with empty field_name
 my $result_empty = Koha::Plugin::Com::BibLibre::LLMSearch::Search::Tools::execute_get_authorized_values({ field_name => '' });
 is($result_empty->{error}, 'field_name parameter is required', 'Tools::execute_get_authorized_values rejects empty field_name');
