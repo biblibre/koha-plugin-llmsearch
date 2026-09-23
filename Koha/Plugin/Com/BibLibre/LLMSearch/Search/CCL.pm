@@ -54,6 +54,8 @@ sub build_query {
     for my $field_name ( sort keys %$params ) {
         my $val = $params->{$field_name};
         next unless defined $val && $val ne '';
+        # Skip whitespace-only values
+        next if $val =~ /^\s*$/;
         my $ccl_val = is_date_range($val) ? $val : escape_value($val);
         push @parts, $field_name . ':' . $ccl_val;
     }

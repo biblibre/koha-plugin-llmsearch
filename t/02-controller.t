@@ -28,6 +28,8 @@ unshift( @INC, '/kohadevbox/koha/lib/' );
 
 # We need to test the specialized modules
 use Koha::Plugin::Com::BibLibre::LLMSearch::Search::CCL;
+use Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Prompt;
+use Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Chat;
 use Koha::Plugin::Com::BibLibre::LLMSearch::Controller;
 
 # 1. Test CCL module - escape_value
@@ -177,5 +179,160 @@ $log_result = Koha::Plugin::Com::BibLibre::LLMSearch::Stats::Logger::log_request
     data => { usage => { prompt_tokens => 10, completion_tokens => 20 } }
 });
 is($log_result, 1, 'Stats::Logger::log_request returns 1 with full args when enable_stats is disabled');
+
+# 11. Test LLM::Prompt module
+# Test get_fallback_message
+my $fallback_msg = Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Prompt::get_fallback_message();
+ok($fallback_msg, 'Prompt::get_fallback_message returns a message');
+like($fallback_msg, qr/SYSTEM INSTRUCTION/, 'Prompt::get_fallback_message contains SYSTEM INSTRUCTION');
+like($fallback_msg, qr/catalog/, 'Prompt::get_fallback_message mentions catalog');
+
+# Test get_fallback_response
+my $fallback_resp = Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Prompt::get_fallback_response();
+ok($fallback_resp, 'Prompt::get_fallback_response returns a hashref');
+ok(exists $fallback_resp->{choices}, 'Prompt::get_fallback_response has choices');
+ok(exists $fallback_resp->{usage}, 'Prompt::get_fallback_response has usage');
+ok(ref($fallback_resp->{choices}) eq 'ARRAY', 'Prompt::get_fallback_response choices is array');
+
+# Test build_index_list_text (wrapper)
+my $index_text = Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Prompt::build_index_list_text();
+ok($index_text, 'Prompt::build_index_list_text returns a string');
+
+# Test get_system_prompt with custom prompt
+use Koha::Plugin::Com::BibLibre::LLMSearch;
+my $plugin = Koha::Plugin::Com::BibLibre::LLMSearch->new();
+my $custom_prompt = "You are a helpful assistant. {{SEARCH_INDEXES}}";
+my $processed_prompt = Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Prompt::get_system_prompt($plugin, $custom_prompt);
+ok($processed_prompt, 'Prompt::get_system_prompt returns a prompt');
+# The SEARCH_INDEXES placeholder should be replaced with actual index list
+ok(length($processed_prompt) > length($custom_prompt), 'Prompt::get_system_prompt injects index list');
+
+# 12. Test LLM::Chat module
+# Test that the module loads
+ok(1, 'LLM::Chat module loads successfully');
+
+# Test that functions exist
+ok(Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Chat->can('handle_chat_request'), 'Chat::handle_chat_request exists');
+ok(Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Chat->can('execute_chat_loop'), 'Chat::execute_chat_loop exists');
+ok(Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Chat->can('execute_tool_calls'), 'Chat::execute_tool_calls exists');
+
+# Test execute_tool_calls with a mock choice containing tool calls
+# This is a basic test to ensure the function doesn't crash
+my $mock_choice = {
+    message => {
+        tool_calls => []
+    }
+};
+my @mock_messages = ();
+my $mock_rounds = 5;
+my $result = Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Chat::execute_tool_calls({
+    choice => $mock_choice,
+    messages => \@mock_messages,
+    debug_mode => 0,
+    debug_log => [],
+    debug_json => undef,
+    max_tool_rounds => \$mock_rounds,
+});
+ok($result == 0, 'Chat::execute_tool_calls returns 0 when no tool calls');
+
+# Test with an empty messages array (edge case)
+$result = Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Chat::execute_tool_calls({
+    choice => $mock_choice,
+    messages => [],
+    debug_mode => 0,
+    debug_log => [],
+    debug_json => undef,
+    max_tool_rounds => \$mock_rounds,
+});
+ok($result == 0, 'Chat::execute_tool_calls handles empty messages array');
+
+# 13. Additional edge case tests
+
+# CCL module edge cases
+# Test escape_value with various special characters
+is(
+    Koha::Plugin::Com::BibLibre::LLMSearch::Search::CCL::escape_value('test\'s'),
+    '"test\'s"',
+    'CCL::escape_value handles apostrophes'
+);
+
+is(
+    Koha::Plugin::Com::BibLibre::LLMSearch::Search::CCL::escape_value('test\nline'),
+    '"test\nline"',
+    'CCL::escape_value preserves newlines'
+);
+
+# Test build_query with undef values
+my $params_undef = { title => undef, author => 'john' };
+my $query_undef = Koha::Plugin::Com::BibLibre::LLMSearch::Search::CCL::build_query($params_undef);
+is($query_undef, 'author:"john"', 'CCL::build_query ignores undef values');
+
+# Test build_query with whitespace-only values
+my $params_whitespace = { title => '   ', author => 'john' };
+my $query_whitespace = Koha::Plugin::Com::BibLibre::LLMSearch::Search::CCL::build_query($params_whitespace);
+is($query_whitespace, 'author:"john"', 'CCL::build_query ignores whitespace-only values');
+
+# Test is_date_range with edge cases
+ok(
+    !Koha::Plugin::Com::BibLibre::LLMSearch::Search::CCL::is_date_range('abcd'),
+    'CCL::is_date_range does not match non-numeric strings'
+);
+
+ok(
+    !Koha::Plugin::Com::BibLibre::LLMSearch::Search::CCL::is_date_range('200'),
+    'CCL::is_date_range does not match 3-digit years'
+);
+
+ok(
+    !Koha::Plugin::Com::BibLibre::LLMSearch::Search::CCL::is_date_range('20050'),
+    'CCL::is_date_range does not match 5-digit numbers'
+);
+
+# Tools module edge cases
+# Test execute_get_authorized_values with empty field_name
+my $result_empty = Koha::Plugin::Com::BibLibre::LLMSearch::Search::Tools::execute_get_authorized_values({ field_name => '' });
+is($result_empty->{error}, 'field_name parameter is required', 'Tools::execute_get_authorized_values rejects empty field_name');
+
+# Test execute_get_authority with empty value
+my $result_empty_value = Koha::Plugin::Com::BibLibre::LLMSearch::Search::Tools::execute_get_authority({ field_name => 'author', value => '' });
+ok($result_empty_value->{exists} == 0, 'Tools::execute_get_authority returns exists=0 for empty value');
+
+# Test execute_get_authority with undef value
+my $result_undef_value = Koha::Plugin::Com::BibLibre::LLMSearch::Search::Tools::execute_get_authority({ field_name => 'author', value => undef });
+is($result_undef_value->{error}, 'value parameter is required', 'Tools::execute_get_authority rejects undef value');
+
+# Prompt module edge cases
+# Test get_system_prompt with empty custom prompt
+my $empty_prompt = Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Prompt::get_system_prompt($plugin, '');
+ok($empty_prompt, 'Prompt::get_system_prompt handles empty custom prompt');
+
+# Test get_system_prompt with undef custom prompt
+my $undef_prompt = Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Prompt::get_system_prompt($plugin, undef);
+ok($undef_prompt, 'Prompt::get_system_prompt handles undef custom prompt');
+
+# Test get_system_prompt with whitespace-only custom prompt
+my $whitespace_prompt = Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Prompt::get_system_prompt($plugin, '   ');
+ok($whitespace_prompt, 'Prompt::get_system_prompt handles whitespace-only custom prompt');
+
+# Test get_fallback_response structure
+my $fallback = Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Prompt::get_fallback_response();
+ok(exists $fallback->{choices}[0]{message}{role}, 'Prompt::get_fallback_response has role');
+ok($fallback->{choices}[0]{message}{role} eq 'assistant', 'Prompt::get_fallback_response role is assistant');
+ok(exists $fallback->{choices}[0]{finish_reason}, 'Prompt::get_fallback_response has finish_reason');
+ok($fallback->{usage}{prompt_tokens} == 0, 'Prompt::get_fallback_response prompt_tokens is 0');
+ok($fallback->{usage}{completion_tokens} == 0, 'Prompt::get_fallback_response completion_tokens is 0');
+
+# Stats::Logger edge cases
+# Test log_request with undef lang
+$log_result = Koha::Plugin::Com::BibLibre::LLMSearch::Stats::Logger::log_request({ lang => undef, data => {} });
+is($log_result, 1, 'Stats::Logger::log_request handles undef lang');
+
+# Test log_request with undef data
+$log_result = Koha::Plugin::Com::BibLibre::LLMSearch::Stats::Logger::log_request({ lang => 'fr', data => undef });
+is($log_result, 1, 'Stats::Logger::log_request handles undef data');
+
+# Test log_request with missing usage in data
+$log_result = Koha::Plugin::Com::BibLibre::LLMSearch::Stats::Logger::log_request({ lang => 'fr', data => {} });
+is($log_result, 1, 'Stats::Logger::log_request handles missing usage data');
 
 done_testing();
