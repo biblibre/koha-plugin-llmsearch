@@ -40,8 +40,13 @@ sub log_request {
         $patron = $patron->unblessed() if $patron;
     }
 
-    my $prompt_tokens = $response ? ($response->{usage}{prompt_tokens} // 0) : 0;
-    my $completion_tokens = $response ? ($response->{usage}{completion_tokens} // 0) : 0;
+    # Safely extract token counts from response - handle various input types
+    my $prompt_tokens = 0;
+    my $completion_tokens = 0;
+    if ($response && ref($response) eq 'HASH' && $response->{usage}) {
+        $prompt_tokens = $response->{usage}{prompt_tokens} // 0;
+        $completion_tokens = $response->{usage}{completion_tokens} // 0;
+    }
 
     my $query = "INSERT INTO $table (
                      opac_lang,
