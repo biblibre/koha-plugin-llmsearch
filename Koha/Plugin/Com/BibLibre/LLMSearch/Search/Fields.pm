@@ -46,6 +46,9 @@ sub get_field_av_category {
     my $dbh       = C4::Context->dbh;
     my $marc_type = lc( C4::Context->preference('marcflavour') );
 
+    return $field_name
+	if ( grep(/$field_name/, ('itemtype', 'itype', 'holdingbranch', 'homebranch') ) );
+
     # marc_field is stored as e.g. "245a" or "245$a"; handle both formats.
     # Filter by marc_type so UNIMARC instances don't match MARC21 mappings
     # (and vice-versa).

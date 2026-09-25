@@ -154,6 +154,9 @@ sub execute_search {
 =head2 execute_get_authorized_values
 
 Returns the list of valid authorized values for a given search field.
+For itemtype/itype fields, returns document types from Koha::ItemTypes.
+For holdingbranch and homebranch fields, returns library branches from Koha::Libraries.
+For other fields with controlled vocabulary, returns values from authorised_values.
 
 =cut
 
@@ -164,6 +167,33 @@ sub execute_get_authorized_values {
     return { error => 'field_name parameter is required' }
         unless $field_name;
 
+    # Special handling for itemtype/itype fields
+    if ( $field_name eq 'itemtype' || $field_name eq 'itype' ) {
+        my $item_types = Koha::ItemTypes->search_with_localization;
+        my @values;
+        while ( my $item_type = $item_types->next ) {
+            push @values, {
+                value => $item_type->itemtype,
+                label => $item_type->translated_description,
+            };
+        }
+        return { field_type => 'itemtype', values => \@values };
+    }
+
+    # Special handling for holdingbranch and homebranch fields
+    if ( $field_name eq 'holdingbranch' || $field_name eq 'homebranch' ) {
+        my $libraries = Koha::Libraries->search( {}, { order_by => 'branchname' } );
+        my @values;
+        while ( my $library = $libraries->next ) {
+            push @values, {
+                value => $library->branchcode,
+                label => $library->branchname,
+            };
+        }
+        return { field_type => $field_name, values => \@values };
+    }
+
+    # Default handling for authorized values
     my $category = Koha::Plugin::Com::BibLibre::LLMSearch::Search::Fields::get_field_av_category($field_name);
     return { message => "Field '$field_name' does not use controlled vocabulary" }
         unless $category;
