@@ -68,6 +68,21 @@ sub get_search_tools {
         {
             type     => 'function',
             function => {
+                name        => 'get_item_types',
+                description =>
+                    'Get the list of available document/item types from Koha. '
+                    . 'Returns all document type codes with their translated descriptions. '
+                    . 'Use this to get valid itype values for searching.',
+                parameters => {
+                    type       => 'object',
+                    properties => {},
+                    required   => [],
+                },
+            },
+        },
+        {
+            type     => 'function',
+            function => {
                 name        => 'get_authority',
                 description =>
                     'Check if an authority exists using Koha\'s authority search system. '
@@ -211,6 +226,31 @@ sub execute_get_search_indexes {
     }
 
     return { indexes => \@indexes };
+}
+
+=head2 execute_get_item_types
+
+Returns the list of available document/item types from Koha.
+These are the valid values for the 'itype' field in catalog searches.
+
+=cut
+
+sub execute_get_item_types {
+    my ($params) = @_;  # No parameters needed
+
+    # Use Koha::ItemTypes to get all document types with localization
+    my $item_types = Koha::ItemTypes->search_with_localization;
+
+    my @types;
+    while ( my $item_type = $item_types->next ) {
+        push @types, {
+            itemtype => $item_type->itemtype,
+            description => $item_type->translated_description,
+            imageurl => $item_type->imageurl,
+        };
+    }
+
+    return { item_types => \@types };
 }
 
 =head2 execute_get_authority

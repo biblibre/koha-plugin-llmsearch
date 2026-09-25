@@ -142,6 +142,7 @@ ok(exists $tool_names{'search_catalog'}, 'Tools::get_search_tools includes searc
 ok(exists $tool_names{'get_authorized_values'}, 'Tools::get_search_tools includes get_authorized_values');
 ok(exists $tool_names{'get_authority'}, 'Tools::get_search_tools includes get_authority');
 ok(exists $tool_names{'get_search_indexes'}, 'Tools::get_search_tools includes get_search_indexes');
+ok(exists $tool_names{'get_item_types'}, 'Tools::get_search_tools includes get_item_types');
 
 # 6. Test Fields::get_field_av_category
 # This requires database access, so we just verify it exists and doesn't crash
@@ -301,6 +302,19 @@ if (@{$indexes_result->{indexes}}) {
     ok(exists $first_index->{name}, 'Tools::execute_get_search_indexes first index has name');
     ok(exists $first_index->{label}, 'Tools::execute_get_search_indexes first index has label');
     ok(exists $first_index->{description}, 'Tools::execute_get_search_indexes first index has description');
+}
+
+# Test execute_get_item_types
+my $item_types_result = Koha::Plugin::Com::BibLibre::LLMSearch::Search::Tools::execute_get_item_types({});
+ok($item_types_result, 'Tools::execute_get_item_types returns result');
+ok(exists $item_types_result->{item_types}, 'Tools::execute_get_item_types returns item_types array');
+ok(ref($item_types_result->{item_types}) eq 'ARRAY', 'Tools::execute_get_item_types item_types is array');
+
+# Verify that item types have the expected structure
+if (@{$item_types_result->{item_types}}) {
+    my $first_type = $item_types_result->{item_types}[0];
+    ok(exists $first_type->{itemtype}, 'Tools::execute_get_item_types first type has itemtype');
+    ok(exists $first_type->{description}, 'Tools::execute_get_item_types first type has description');
 }
 
 # Test execute_get_authorized_values with empty field_name
