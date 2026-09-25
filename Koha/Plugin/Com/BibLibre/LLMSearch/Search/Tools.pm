@@ -144,7 +144,6 @@ sub execute_search {
         $searcher->simple_search_compat( $query, 0, 1 );
 
     if ($error) {
-        warn "LLMSearch: search error for query '$query': $error";
         return { count => 0, query => $query, error => "$error" };
     }
 

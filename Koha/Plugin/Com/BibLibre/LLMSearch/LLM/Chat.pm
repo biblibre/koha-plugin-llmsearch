@@ -174,8 +174,15 @@ sub execute_chat_loop {
                 current_round => $current_round,
             });
 
-            # If we found results, allow one more round
+            # If we found results, inject a system message to force the LLM to stop
+            # and present the results to the user
             if ($has_results) {
+                push @$messages, {
+                    role    => 'system',
+                    content => 'You have validated search results. STOP making tool calls. '
+                            . 'Present the results to the user with search links NOW. '
+                            . 'Do NOT continue refining the search.',
+                };
                 $max_tool_rounds = $current_round + 1;
             }
 
