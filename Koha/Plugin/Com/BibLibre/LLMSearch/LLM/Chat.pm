@@ -131,11 +131,12 @@ sub execute_chat_loop {
     my @debug_log;
     my $debug_json = $debug_mode ? JSON->new->utf8->max_depth(2048) : undef;
 
-    for my $round ( 1 .. $max_tool_rounds ) {
+    my $current_round = 1;
+    while ( $current_round <= $max_tool_rounds ) {
         my $chat_payload = { model => $model, messages => $messages, tools => $tools };
 
         if ( $debug_mode ) {
-            eval { push @debug_log, $debug_json->encode({ round => $round, request => $chat_payload }) };
+            eval { push @debug_log, $debug_json->encode({ round => $current_round, request => $chat_payload }) };
             warn "LLMSearch debug encode error (request): $@" if $@;
         }
 
@@ -153,7 +154,7 @@ sub execute_chat_loop {
         my $choice = $response_data->{choices}[0];
 
         if ( $debug_mode ) {
-            eval { push @debug_log, $debug_json->encode({ round => $round, response => $response_data }) };
+            eval { push @debug_log, $debug_json->encode({ round => $current_round, response => $response_data }) };
             warn "LLMSearch debug encode error (response): $@" if $@;
         }
 
@@ -170,9 +171,16 @@ sub execute_chat_loop {
                 debug_log => \@debug_log,
                 debug_json => $debug_json,
                 max_tool_rounds => \$max_tool_rounds,
+                current_round => $current_round,
             });
 
+            # If we found results, allow one more round
+            if ($has_results) {
+                $max_tool_rounds = $current_round + 1;
+            }
+
             # Go back to LLM with tool results
+            $current_round++;
             next;
         }
 
@@ -221,6 +229,7 @@ sub execute_tool_calls {
     my $debug_log = $args->{debug_log};
     my $debug_json = $args->{debug_json};
     my $max_tool_rounds = $args->{max_tool_rounds};
+    my $current_round = $args->{current_round} || 1;
     
     my $has_results = 0;
 
@@ -233,8 +242,9 @@ sub execute_tool_calls {
 
         if ( $fn_name eq 'search_catalog' ) {
             $result = Koha::Plugin::Com::BibLibre::LLMSearch::Search::Tools::execute_search($fn_args);
-            $has_results = 1 if $result->{'count'} ge 1;
-            $$max_tool_rounds = 1 if $has_results;  # Allow one more round if we found results
+            if ( $result->{'count'} ge 1 ) {
+                $has_results = 1;
+            }
         }
         elsif ( $fn_name eq 'get_authorized_values' ) {
             $result = Koha::Plugin::Com::BibLibre::LLMSearch::Search::Tools::execute_get_authorized_values($fn_args);
@@ -254,7 +264,7 @@ sub execute_tool_calls {
 
         if ( $debug_mode ) {
             eval { push @$debug_log, $debug_json->encode({
-                round       => 1,
+                round       => $current_round,
                 tool_call   => $fn_name,
                 arguments   => $fn_args,
                 tool_result => $result,
