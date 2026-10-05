@@ -11,7 +11,7 @@ use Mojo::JSON qw(decode_json);
 use Koha::DateUtils qw( dt_from_string );
 
 ## Here we set our plugin version
-our $VERSION = "1.3";
+our $VERSION = "1.4";
 our $MINIMUM_VERSION = "23.11";
 
 ## Here is our metadata, some keys are required, some are optional
@@ -47,7 +47,6 @@ sub new {
 sub install {
     my ( $self, $args ) = @_;
     my $table = $self->get_qualified_table_name('stats');
-    warn "Install LLMSEARCH";
     return C4::Context->dbh->do("
            CREATE TABLE IF NOT EXISTS $table (
                id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,

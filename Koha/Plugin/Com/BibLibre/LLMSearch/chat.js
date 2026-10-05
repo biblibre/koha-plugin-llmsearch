@@ -136,6 +136,22 @@ function preprocessContent(content) {
     temp.innerHTML = html;
     temp.querySelectorAll('a[href]').forEach(function(a) {
         var href = a.getAttribute('href');
+        // URL-decode the href value to handle any encoded characters
+        // Try decoding up to 2 times to handle double-encoded URLs
+        try {
+            var decoded = decodeURIComponent(href);
+            if (decoded !== href) {
+                // Successfully decoded once, try again for double-encoding
+                var decoded2 = decodeURIComponent(decoded);
+                if (decoded2 !== decoded) {
+                    href = decoded2;
+                } else {
+                    href = decoded;
+                }
+            }
+        } catch (e) {
+            // decodeURIComponent may fail on malformed input, continue with original
+        }
         // Normalise protocol-relative URLs (//host/path) so URL() can parse them
         var absolute = /^\/\//.test(href) ? 'https:' + href : href;
         try {
