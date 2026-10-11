@@ -34,10 +34,11 @@ sub get_search_tools {
             function => {
                 name        => 'search_catalog',
                 description =>
-                    'Search the library catalog and return the number of matching results. '
-                    . 'Call this tool to verify that a search will return results BEFORE including a link in your response. '
-                    . 'If the count is 0, adjust the criteria (broader terms, fewer constraints, synonyms) and try again. '
-                    . 'Use field names obtained from the get_search_indexes tool. Pass parameters as fieldname: value pairs.',
+                    'Search the catalog and return the number of matching results. '
+                    . 'Parameters are search field/value pairs (e.g. {"subject": "science fiction"}); '
+                    . 'use field names from the get_search_indexes tool. '
+                    . 'If the count is 0, broaden the criteria and try again. '
+                    . 'Always call this tool before giving the user a search link.',
                 parameters => {
                     type       => 'object',
                     properties => {},
@@ -70,9 +71,9 @@ sub get_search_tools {
             function => {
                 name        => 'get_item_types',
                 description =>
-                    'Get the list of available document/item types from Koha. '
-                    . 'Returns all document type codes with their translated descriptions. '
-                    . 'Use this to get valid itype values for searching.',
+                    'Get the available document/item type codes with their descriptions. '
+                    . 'Call this when the user asks for a medium or type (music, film, audiobook...) '
+                    . 'and use a returned code as the itemtype value in search_catalog.',
                 parameters => {
                     type       => 'object',
                     properties => {},
@@ -85,10 +86,9 @@ sub get_search_tools {
             function => {
                 name        => 'get_authority',
                 description =>
-                    'Check if an authority exists using Koha\'s authority search system. '
-                    . 'Call this when a field description says "[authority field]" '
-                    . 'to verify that the authority value exists before searching. '
-                    . 'Returns: exists (bool), authid, count, and heading if found.',
+                    'Check that an authority (author, subject heading, series...) exists in the library authority records. '
+                    . 'Returns: exists (bool), authid, count, and heading (standardized display form) if found. '
+                    . 'Optional: call before searching to validate a name and prefer the returned heading.',
                 parameters => {
                     type       => 'object',
                     properties => {
@@ -110,9 +110,8 @@ sub get_search_tools {
             function => {
                 name        => 'get_search_indexes',
                 description =>
-                    'Get the list of available search indexes for the catalog. '
-                    . 'Call this tool when you need to know which fields are available for searching. '
-                    . 'Returns: indexes (array of objects with name and label properties).',
+                    'Get the list of available search fields (name and label) for the catalog. '
+                    . 'Call this tool FIRST: search_catalog only accepts field names from this list.',
                 parameters => {
                     type       => 'object',
                     properties => {},

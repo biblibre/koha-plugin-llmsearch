@@ -132,9 +132,11 @@ sub execute_chat_loop {
     my @debug_log;
     my $debug_json = $debug_mode ? JSON->new->utf8->max_depth(2048) : undef;
 
-    my $current_round = 1;
+    my $made_tool_call = 0;
+    my $nudged         = 0;
+    my $current_round  = 1;
     while ( $current_round <= $max_tool_rounds ) {
-        my $chat_payload = encode_json({ model => $model, messages => $messages, tools => $tools, think => JSON::false, stream => JSON::false });
+        my $chat_payload = encode_json({ model => $model, messages => $messages, tools => $tools });
         if ( $debug_mode ) {
             eval { push @debug_log, $debug_json->encode({ round => $current_round, request => $chat_payload }) };
             warn "LLMSearch debug encode error (request): $@" if $@;
@@ -158,6 +160,7 @@ sub execute_chat_loop {
 
         # If the LLM wants to call tools, execute them and loop
         if ( $choice->{finish_reason} && $choice->{finish_reason} eq 'tool_calls' ) {
+            $made_tool_call = 1;
             # Append the assistant's tool_calls message to the history
             push @$messages, $choice->{message};
 
@@ -185,6 +188,22 @@ sub execute_chat_loop {
             }
 
             # Go back to LLM with tool results
+            $current_round++;
+            next;
+        }
+
+        # LLM answered without ever calling a tool. Small models sometimes
+        # "simulate" the tools instead of calling them: nudge once toward
+        # the real tools before accepting the answer.
+        if ( !$made_tool_call && !$nudged && $current_round < $max_tool_rounds ) {
+            push @$messages, $choice->{message};
+            push @$messages, {
+                role    => 'system',
+                content => 'You answered without calling any tool. You MUST call the tools: '
+                    . 'get_search_indexes first to get the field names, then search_catalog '
+                    . 'to validate a search. Call the tools now.',
+            };
+            $nudged = 1;
             $current_round++;
             next;
         }
@@ -235,21 +254,14 @@ sub execute_tool_calls {
     my $debug_json = $args->{debug_json};
     my $max_tool_rounds = $args->{max_tool_rounds};
     my $current_round = $args->{current_round} || 1;
-    
-    my $has_results = 0;
-
     for my $tool_call ( @{ $choice->{message}{tool_calls} } ) {
         my $fn_name = $tool_call->{function}{name};
         # arguments is a Perl Unicode string extracted from the parsed
         # JSON response; re-encode to UTF-8 bytes before decoding again.
         my $fn_args = decode_json( encode('UTF-8', $tool_call->{function}{arguments}) );
-        my $result;
-
+	my $result;
         if ( $fn_name eq 'search_catalog' ) {
             $result = Koha::Plugin::Com::BibLibre::LLMSearch::Search::Tools::execute_search($fn_args);
-            if ( $result->{'count'} ge 1 ) {
-                $has_results = 1;
-            }
         }
         elsif ( $fn_name eq 'get_authorized_values' ) {
             $result = Koha::Plugin::Com::BibLibre::LLMSearch::Search::Tools::execute_get_authorized_values($fn_args);
@@ -282,9 +294,11 @@ sub execute_tool_calls {
             tool_call_id => $tool_call->{id},
             content      => encode_json($result),
         };
-    }
 
-    return $has_results;
+	return 1
+	    if ( $result->{'count'} && $result->{'count'} ge 1 );
+    }
+    return 0;
 }
 
 =head2 call
