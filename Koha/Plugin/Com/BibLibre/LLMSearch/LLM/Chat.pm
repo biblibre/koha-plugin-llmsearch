@@ -4,9 +4,10 @@ use Modern::Perl;
 use C4::Context;
 use C4::Auth qw( get_session );
 use JSON qw( encode_json decode_json );
+use LWP::UserAgent;
+use HTTP::Request;
 use URI::Escape;
 use Encode qw(encode);
-use Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Client;
 use Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Prompt;
 use Koha::Plugin::Com::BibLibre::LLMSearch::Search::Tools;
 use Koha::Plugin::Com::BibLibre::LLMSearch::Stats::Logger;
@@ -133,23 +134,20 @@ sub execute_chat_loop {
 
     my $current_round = 1;
     while ( $current_round <= $max_tool_rounds ) {
-        my $chat_payload = { model => $model, messages => $messages, tools => $tools };
-
+        my $chat_payload = encode_json({ model => $model, messages => $messages, tools => $tools, think => JSON::false, stream => JSON::false });
         if ( $debug_mode ) {
             eval { push @debug_log, $debug_json->encode({ round => $current_round, request => $chat_payload }) };
             warn "LLMSearch debug encode error (request): $@" if $@;
         }
 
-        my $http_response = Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Client::call( $user_agent, $base_url, $api_key, $chat_payload );
-
+        my $http_response = api_call( $user_agent, $base_url, $api_key, $chat_payload );
+        my $content = $http_response->decoded_content;
         unless ( $http_response->is_success ) {
             return $c->render(
                 status  => 500,
-                openapi => { error => $http_response->decoded_content }
+                openapi => { error => $content }
             );
         }
-
-        my $content = $http_response->decoded_content;
         my $response_data = decode_json($content);
         my $choice = $response_data->{choices}[0];
 
@@ -204,8 +202,8 @@ sub execute_chat_loop {
             content => Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Prompt::get_fallback_message(),
         };
 
-        my $fallback_payload = { model => $model, messages => $messages };
-        my $fallback_http = Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Client::call( $user_agent, $base_url, $api_key, $fallback_payload );
+        my $fallback_payload = { model => $model, messages => $messages, think => JSON::false, stream => JSON::false };
+        my $fallback_http = api_call( $user_agent, $base_url, $api_key, $fallback_payload );
 
         if ( $fallback_http->is_success ) {
             my $fallback_content = $fallback_http->decoded_content;
@@ -287,6 +285,23 @@ sub execute_tool_calls {
     }
 
     return $has_results;
+}
+
+=head2 call
+
+Sends a request to the LLM API and returns the HTTP::Response object.
+
+=cut
+
+sub api_call {
+    my ( $ua, $base_url, $api_key, $payload ) = @_;
+    my $header = [
+        'Content-Type'  => 'application/json',
+        'Accept'        => 'application/json',
+        'Authorization' => 'Bearer ' . $api_key,
+    ];
+    my $req = HTTP::Request->new( 'POST', $base_url, $header, $payload );
+    return $ua->request($req);
 }
 
 1;

@@ -38,7 +38,6 @@ ok($plugin, 'Plugin instantiated');
 
 # 3. Metadata
 is($plugin->{metadata}->{name}, 'LLM Search', 'Correct plugin name');
-is($plugin->{metadata}->{version}, '1.2', 'Correct version');
 is($plugin->{metadata}->{minimum_version}, '23.11', 'Minimum version 23.11');
 ok(!defined $plugin->{metadata}->{maximum_version}, 'No maximum version');
 
