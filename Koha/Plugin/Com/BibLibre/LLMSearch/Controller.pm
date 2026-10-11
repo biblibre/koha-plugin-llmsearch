@@ -20,7 +20,7 @@ sub welcome {
 
 sub chat {
     my $c = shift;
-    return Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Chat::handle_chat_request($c, $plugin);
+    return Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Chat::handle_chat_request($c);
 }
 
 

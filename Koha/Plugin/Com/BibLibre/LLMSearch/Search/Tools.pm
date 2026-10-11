@@ -122,14 +122,14 @@ sub get_search_tools {
     ];
 }
 
-=head2 execute_search
+=head2 search_catalog
 
 Runs a live Koha catalog search and returns the result count.
 
 =cut
 
-sub execute_search {
-    my ($params) = @_;
+sub search_catalog {
+    my ($self, $params) = @_;
 
     require Koha::SearchEngine::Search;
     require Koha::SearchEngine;
@@ -149,7 +149,7 @@ sub execute_search {
     return { count => ( $total_hits // 0 ), query => $query };
 }
 
-=head2 execute_get_authorized_values
+=head2 get_authorized_values
 
 Returns the list of valid authorized values for a given search field.
 For itemtype/itype fields, returns document types from Koha::ItemTypes.
@@ -158,8 +158,8 @@ For other fields with controlled vocabulary, returns values from authorised_valu
 
 =cut
 
-sub execute_get_authorized_values {
-    my ($params) = @_;
+sub get_authorized_values {
+    my ($self, $params) = @_;
 
     my $field_name = $params->{field_name};
     return { error => 'field_name parameter is required' }
@@ -213,7 +213,7 @@ sub execute_get_authorized_values {
     return { category => $category, values => \@values };
 }
 
-=head2 execute_get_search_indexes
+=head2 get_search_indexes
 
 Returns the list of available search indexes for the catalog.
 This is a lightweight tool that returns just the field names and labels,
@@ -221,9 +221,7 @@ without consuming tokens in the system prompt.
 
 =cut
 
-sub execute_get_search_indexes {
-    my ($params) = @_;  # No parameters needed
-
+sub get_search_indexes {
     my $fields = Koha::Plugin::Com::BibLibre::LLMSearch::Search::Fields::get_opac_biblio_search_fields();
 
     my @indexes;
@@ -256,16 +254,14 @@ sub execute_get_search_indexes {
     return { indexes => \@indexes };
 }
 
-=head2 execute_get_item_types
+=head2 get_item_types
 
 Returns the list of available document/item types from Koha.
 These are the valid values for the 'itype' field in catalog searches.
 
 =cut
 
-sub execute_get_item_types {
-    my ($params) = @_;  # No parameters needed
-
+sub get_item_types {
     # Use Koha::ItemTypes to get all document types with localization
     my $item_types = Koha::ItemTypes->search_with_localization;
 
@@ -281,15 +277,15 @@ sub execute_get_item_types {
     return { item_types => \@types };
 }
 
-=head2 execute_get_authority
+=head2 get_authority
 
 Checks if an authority exists in the database for a given search field.
 Uses Koha::SearchEngine::Search->search_auth_compat for proper authority search.
 
 =cut
 
-sub execute_get_authority {
-    my ($params) = @_;
+sub get_authority {
+    my ($self, $params) = @_;
 
     my $field_name = $params->{field_name};
     my $value      = $params->{value};
