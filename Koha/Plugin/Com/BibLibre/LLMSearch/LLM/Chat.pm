@@ -8,6 +8,7 @@ use LWP::UserAgent;
 use HTTP::Request;
 use URI::Escape;
 use Encode qw(encode);
+use Koha::Plugin::Com::BibLibre::LLMSearch;
 use Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Prompt;
 use Koha::Plugin::Com::BibLibre::LLMSearch::Search::Tools;
 use Koha::Plugin::Com::BibLibre::LLMSearch::Stats::Logger;
@@ -30,8 +31,11 @@ and executing tools as needed.
 
 =cut
 
+our $plugin = Koha::Plugin::Com::BibLibre::LLMSearch->new();
+our $tools  = "Koha::Plugin::Com::BibLibre::LLMSearch::Search::Tools";
+
 sub handle_chat_request {
-    my ($c, $plugin) = @_;
+    my ($c) = @_;
     my $cookies = $c->req->cookies;
 
     my $session;
@@ -50,25 +54,16 @@ sub handle_chat_request {
         openapi => { error => "missing authorization from UI" }
     ) if $session->is_new();
 
-    $c = $c->openapi->valid_input or return;
-
-    my $api_key  = $plugin->retrieve_data('api_key');
-    my $base_url = $plugin->retrieve_data('base_url');
-    my $model    = $plugin->retrieve_data('model');
-
     return $c->render(
-        status  => 500,
-        openapi => { error => "missing configuration" }
-    ) unless $base_url and $model;
+	status => 500,
+	openapi => { error => "invalid input" }
+    ) unless $c->openapi->valid_input;
 
     # Get system prompt
     my $prompt = Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Prompt::get_system_prompt($plugin);
     
     my $max_tool_rounds = $plugin->retrieve_data('max_tool_rounds') // 5;
     $max_tool_rounds = 1 if $max_tool_rounds < 1;
-
-    my $user_agent = LWP::UserAgent->new;
-    $user_agent->agent("KohaLLMSearch");
 
     # Parse incoming JSON
     my $json = $c->validation->param('json');
@@ -86,17 +81,10 @@ sub handle_chat_request {
     }
 
     # Agentic tool-call loop
-    my $tools = Koha::Plugin::Com::BibLibre::LLMSearch::Search::Tools::get_search_tools();
     my $final_response = execute_chat_loop({
         c => $c,
-        user_agent => $user_agent,
-        base_url => $base_url,
-        api_key => $api_key,
-        model => $model,
         messages => \@messages,
-        tools => $tools,
-        max_tool_rounds => $max_tool_rounds,
-        debug_mode => $plugin->retrieve_data('debug_mode') // 0,
+        max_tool_rounds => $max_tool_rounds
     });
 
     # Log the request
@@ -119,42 +107,38 @@ Executes the main chat loop with the LLM, handling tool calls.
 sub execute_chat_loop {
     my ($args) = @_;
     my $c = $args->{c};
-    my $user_agent = $args->{user_agent};
-    my $base_url = $args->{base_url};
-    my $api_key = $args->{api_key};
-    my $model = $args->{model};
     my $messages = $args->{messages};
-    my $tools = $args->{tools};
     my $max_tool_rounds = $args->{max_tool_rounds};
-    my $debug_mode = $args->{debug_mode};
-
+    my $debug_mode => $plugin->retrieve_data('debug_mode') // 0;
     my $final_response;
     my @debug_log;
-    my $debug_json = $debug_mode ? JSON->new->utf8->max_depth(2048) : undef;
 
     my $made_tool_call = 0;
     my $nudged         = 0;
     my $current_round  = 1;
+
+    my $base_url = $plugin->retrieve_data('base_url');
+    my $model    = $plugin->retrieve_data('model');
+    return "missing configuration"
+	unless $base_url and $model;
+
     while ( $current_round <= $max_tool_rounds ) {
-        my $chat_payload = encode_json({ model => $model, messages => $messages, tools => $tools });
+        my $chat_payload = { model => $model, messages => $messages, tools => $tools->get_search_tools() };
         if ( $debug_mode ) {
-            eval { push @debug_log, $debug_json->encode({ round => $current_round, request => $chat_payload }) };
+            eval { push @debug_log, encode_json({ round => $current_round, request => $chat_payload }) };
             warn "LLMSearch debug encode error (request): $@" if $@;
         }
 
-        my $http_response = api_call( $user_agent, $base_url, $api_key, $chat_payload );
+        my $http_response = api_call( $chat_payload );
         my $content = $http_response->decoded_content;
-        unless ( $http_response->is_success ) {
-            return $c->render(
-                status  => 500,
-                openapi => { error => $content }
-            );
-        }
+        return $content
+	    unless ( $http_response->is_success );
+
         my $response_data = decode_json($content);
         my $choice = $response_data->{choices}[0];
 
         if ( $debug_mode ) {
-            eval { push @debug_log, $debug_json->encode({ round => $current_round, response => $response_data }) };
+            eval { push @debug_log, encode_json({ round => $current_round, response => $response_data }) };
             warn "LLMSearch debug encode error (response): $@" if $@;
         }
 
@@ -168,9 +152,7 @@ sub execute_chat_loop {
             my $has_results = execute_tool_calls({
                 choice => $choice,
                 messages => $messages,
-                debug_mode => $debug_mode,
                 debug_log => \@debug_log,
-                debug_json => $debug_json,
                 max_tool_rounds => \$max_tool_rounds,
                 current_round => $current_round,
             });
@@ -222,7 +204,7 @@ sub execute_chat_loop {
         };
 
         my $fallback_payload = { model => $model, messages => $messages, think => JSON::false, stream => JSON::false };
-        my $fallback_http = api_call( $user_agent, $base_url, $api_key, $fallback_payload );
+        my $fallback_http = api_call( $fallback_payload );
 
         if ( $fallback_http->is_success ) {
             my $fallback_content = $fallback_http->decoded_content;
@@ -249,38 +231,25 @@ sub execute_tool_calls {
     my ($args) = @_;
     my $choice = $args->{choice};
     my $messages = $args->{messages};
-    my $debug_mode = $args->{debug_mode};
     my $debug_log = $args->{debug_log};
-    my $debug_json = $args->{debug_json};
     my $max_tool_rounds = $args->{max_tool_rounds};
     my $current_round = $args->{current_round} || 1;
+    my $debug_mode = $plugin->retrieve_data('debug_mode') // 0;
     for my $tool_call ( @{ $choice->{message}{tool_calls} } ) {
         my $fn_name = $tool_call->{function}{name};
         # arguments is a Perl Unicode string extracted from the parsed
         # JSON response; re-encode to UTF-8 bytes before decoding again.
         my $fn_args = decode_json( encode('UTF-8', $tool_call->{function}{arguments}) );
-	my $result;
-        if ( $fn_name eq 'search_catalog' ) {
-            $result = Koha::Plugin::Com::BibLibre::LLMSearch::Search::Tools::execute_search($fn_args);
-        }
-        elsif ( $fn_name eq 'get_authorized_values' ) {
-            $result = Koha::Plugin::Com::BibLibre::LLMSearch::Search::Tools::execute_get_authorized_values($fn_args);
-        }
-        elsif ( $fn_name eq 'get_authority' ) {
-            $result = Koha::Plugin::Com::BibLibre::LLMSearch::Search::Tools::execute_get_authority($fn_args);
-        }
-        elsif ( $fn_name eq 'get_search_indexes' ) {
-            $result = Koha::Plugin::Com::BibLibre::LLMSearch::Search::Tools::execute_get_search_indexes();
-        }
-        elsif ( $fn_name eq 'get_item_types' ) {
-            $result = Koha::Plugin::Com::BibLibre::LLMSearch::Search::Tools::execute_get_item_types();
-        }
+        my $result;
+	if ( defined $tools->$fn_name ) {
+	    $result = $tools->$fn_name( $fn_args );
+	}
         else {
             $result = { error => "Unknown tool: $fn_name" };
         }
 
         if ( $debug_mode ) {
-            eval { push @$debug_log, $debug_json->encode({
+            eval { push @$debug_log, encode_json({
                 round       => $current_round,
                 tool_call   => $fn_name,
                 arguments   => $fn_args,
@@ -295,8 +264,8 @@ sub execute_tool_calls {
             content      => encode_json($result),
         };
 
-	return 1
-	    if ( $result->{'count'} && $result->{'count'} ge 1 );
+        return 1
+            if ( $result->{'count'} && $result->{'count'} ge 1 );
     }
     return 0;
 }
@@ -308,13 +277,17 @@ Sends a request to the LLM API and returns the HTTP::Response object.
 =cut
 
 sub api_call {
-    my ( $ua, $base_url, $api_key, $payload ) = @_;
+    my ( $payload ) = @_;
+    my $api_key  = $plugin->retrieve_data('api_key');
+    my $base_url = $plugin->retrieve_data('base_url');
     my $header = [
         'Content-Type'  => 'application/json',
         'Accept'        => 'application/json',
         'Authorization' => 'Bearer ' . $api_key,
-    ];
-    my $req = HTTP::Request->new( 'POST', $base_url, $header, $payload );
+        ];
+    my $req = HTTP::Request->new( 'POST', $base_url, $header, encode_json($payload) );
+    my $ua = LWP::UserAgent->new;
+    $ua->agent("KohaLLMSearch");
     return $ua->request($req);
 }
 

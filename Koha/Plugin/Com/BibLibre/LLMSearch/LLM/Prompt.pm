@@ -22,7 +22,7 @@ embedded system_prompt.txt file, and injects the live search indexes.
 =cut
 
 sub get_system_prompt {
-    my ($plugin, $custom_prompt) = @_;
+    my ($plugin) = @_;
     # Use custom prompt if provided (non-empty), otherwise get from plugin config or default file
     my $prompt = $plugin->retrieve_data('system_prompt');
     $prompt = $plugin->mbf_read('system_prompt.txt') if $prompt eq '';
