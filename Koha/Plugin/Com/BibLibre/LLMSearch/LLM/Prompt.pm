@@ -1,7 +1,6 @@
 package Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Prompt;
 
 use Modern::Perl;
-use Koha::Plugin::Com::BibLibre::LLMSearch::Search::Fields;
 
 =head1 NAME
 
@@ -17,27 +16,16 @@ for the LLM assistant.
 =head2 get_system_prompt
 
 Gets the system prompt, either from plugin configuration or from the
-embedded system_prompt.txt file, and injects the live search indexes.
+embedded system_prompt.txt file.
 
 =cut
 
 sub get_system_prompt {
     my ($plugin) = @_;
-    # Use custom prompt if provided (non-empty), otherwise get from plugin config or default file
+    # Get the prompt from plugin config, or the default file if not configured
     my $prompt = $plugin->retrieve_data('system_prompt');
     $prompt = $plugin->mbf_read('system_prompt.txt') if $prompt eq '';
     return $prompt;
-}
-
-=head2 build_index_list_text
-
-Builds a human-readable index list from live Koha search fields.
-This is a wrapper around Search::Fields::build_index_list_text for convenience.
-
-=cut
-
-sub build_index_list_text {
-    return Koha::Plugin::Com::BibLibre::LLMSearch::Search::Fields::build_index_list_text();
 }
 
 =head2 get_fallback_message

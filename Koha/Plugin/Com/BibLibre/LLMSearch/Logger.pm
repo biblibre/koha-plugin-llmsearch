@@ -1,4 +1,4 @@
-package Koha::Plugin::Com::BibLibre::LLMSearch::Stats::Logger;
+package Koha::Plugin::Com::BibLibre::LLMSearch::Logger;
 
 use Modern::Perl;
 use C4::Context;
@@ -7,7 +7,7 @@ use Koha::Plugin::Com::BibLibre::LLMSearch;
 
 =head1 NAME
 
-Koha::Plugin::Com::BibLibre::LLMSearch::Stats::Logger - Request logging and statistics
+Koha::Plugin::Com::BibLibre::LLMSearch::Logger - Request logging and statistics
 
 =head1 DESCRIPTION
 

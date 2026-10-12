@@ -33,6 +33,7 @@
 	        <strong>Warning:</strong> this prompt controls the LLM's entire behaviour.
 	        Modify only if you know what you are doing.<br/>
 	        The LLM discovers the available search fields at runtime by calling the
+	        <code>get_search_indexes</code> tool.<br/>
 	        Keep the prompt short: small local models (e.g. via Ollama) follow a concise prompt
 	        much more reliably.<br/>
 	        Leave the textarea empty and save to reset to the built-in default prompt.

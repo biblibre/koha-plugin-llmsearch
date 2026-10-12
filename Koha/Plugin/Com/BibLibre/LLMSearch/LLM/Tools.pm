@@ -1,13 +1,12 @@
-package Koha::Plugin::Com::BibLibre::LLMSearch::Search::Tools;
+package Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Tools;
 
 use Modern::Perl;
 use C4::Context;
-use Koha::Plugin::Com::BibLibre::LLMSearch::Search::CCL;
-use Koha::Plugin::Com::BibLibre::LLMSearch::Search::Fields;
+use Koha::Plugin::Com::BibLibre::LLMSearch::Search;
 
 =head1 NAME
 
-Koha::Plugin::Com::BibLibre::LLMSearch::Search::Tools - LLM tool definitions and execution
+Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Tools - LLM tool definitions and execution
 
 =head1 DESCRIPTION
 
@@ -138,7 +137,7 @@ sub search_catalog {
         { index => $Koha::SearchEngine::BIBLIOS_INDEX }
     );
 
-    my $query = Koha::Plugin::Com::BibLibre::LLMSearch::Search::CCL::build_query($params);
+    my $query = Koha::Plugin::Com::BibLibre::LLMSearch::Search::build_query($params);
     my ( $error, $marcresults, $total_hits ) =
         $searcher->simple_search_compat( $query, 0, 1 );
 
@@ -192,7 +191,7 @@ sub get_authorized_values {
     }
 
     # Default handling for authorized values
-    my $category = Koha::Plugin::Com::BibLibre::LLMSearch::Search::Fields::get_field_av_category($field_name);
+    my $category = Koha::Plugin::Com::BibLibre::LLMSearch::Search::get_field_av_category($field_name);
     return { message => "Field '$field_name' does not use controlled vocabulary" }
         unless $category;
 
@@ -222,7 +221,7 @@ without consuming tokens in the system prompt.
 =cut
 
 sub get_search_indexes {
-    my $fields = Koha::Plugin::Com::BibLibre::LLMSearch::Search::Fields::get_opac_biblio_search_fields();
+    my $fields = Koha::Plugin::Com::BibLibre::LLMSearch::Search::get_opac_biblio_search_fields();
 
     my @indexes;
     for my $field (@$fields) {
@@ -238,7 +237,7 @@ sub get_search_indexes {
         }
         
         # Flag fields backed by authorized values
-        if ( my $category = Koha::Plugin::Com::BibLibre::LLMSearch::Search::Fields::get_field_av_category( $field->{name} ) ) {
+        if ( my $category = Koha::Plugin::Com::BibLibre::LLMSearch::Search::get_field_av_category( $field->{name} ) ) {
             $desc .= ' [controlled vocabulary -- call get_authorized_values("'
                    . $field->{name}
                    . '") to get the list of valid values before searching]';

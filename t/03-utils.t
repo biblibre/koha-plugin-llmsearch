@@ -17,7 +17,6 @@
 
 use Modern::Perl;
 use Test::More;
-use Test::Exception;
 use JSON qw(encode_json decode_json);
 
 my $lib = $ENV{PLUGIN_LIB} || File::Spec->catdir(File::Spec->curdir, '..');

@@ -1,17 +1,68 @@
-package Koha::Plugin::Com::BibLibre::LLMSearch::Search::Fields;
+package Koha::Plugin::Com::BibLibre::LLMSearch::Search;
 
 use Modern::Perl;
 use C4::Context;
 
 =head1 NAME
 
-Koha::Plugin::Com::BibLibre::LLMSearch::Search::Fields - Search field utilities
+Koha::Plugin::Com::BibLibre::LLMSearch::Search - Catalog search field and CCL query utilities
 
 =head1 DESCRIPTION
 
-This module provides utilities for working with Koha search fields.
+This module provides utilities for working with Koha search fields and for
+building CCL (Common Command Language) queries for Koha catalog searches.
 
 =head1 FUNCTIONS
+
+=head2 escape_value
+
+Wraps a value in double quotes for CCL phrase search and removes any
+embedded quotes to prevent query injection.
+
+=cut
+
+sub escape_value {
+    my ($val) = @_;
+    $val =~ s/"//g;
+    return qq("$val");
+}
+
+=head2 is_date_range
+
+Returns true if the value looks like a CCL date range expression that
+must NOT be quoted: e.g. "2005", "-2004", "2005-2014", "2005-"
+
+=cut
+
+sub is_date_range {
+    my ($val) = @_;
+    return $val =~ /^-?\d{4}(-\d{4})?$|^\d{4}-$/;
+}
+
+=head2 build_query
+
+Converts structured search parameters into a CCL query string.
+Iterates over whatever field names the LLM provided (which are the live
+Koha search_field names) and builds fieldname:"value" expressions.
+Date range values (e.g. -2004, 2005-2014, 2005) are passed unquoted.
+
+=cut
+
+sub build_query {
+    my ($params) = @_;
+    my @parts;
+
+    for my $field_name ( sort keys %$params ) {
+        my $val = $params->{$field_name};
+        next unless defined $val && $val ne '';
+        # Skip whitespace-only values
+        next if $val =~ /^\s*$/;
+        my $ccl_val = is_date_range($val) ? $val : escape_value($val);
+        push @parts, $field_name . ':' . $ccl_val;
+    }
+
+    return @parts ? join( ' AND ', @parts ) : 'kw:*';
+}
 
 =head2 get_opac_biblio_search_fields
 
@@ -70,30 +121,6 @@ sub get_field_av_category {
     $sth->execute($field_name, $marc_type);
     my ($category) = $sth->fetchrow_array;
     return $category;
-}
-
-=head2 build_index_list_text
-
-Builds a human-readable index list from live Koha search fields,
-for injection into the system prompt via the {{SEARCH_INDEXES}} placeholder.
-
-=cut
-
-sub build_index_list_text {
-    my $fields = get_opac_biblio_search_fields();
-
-    unless (@$fields) {
-        return 'No search indexes are currently configured for the OPAC in this Koha instance.';
-    }
-
-    my @lines = (
-        'Here are the available search field names '
-        . '(use as CCL prefix in queries, e.g. author:"tolkien"):',
-    );
-    for my $f (@$fields) {
-        push @lines, sprintf( '- %s: %s', $f->{name}, $f->{label} );
-    }
-    return join( "\n", @lines );
 }
 
 1;

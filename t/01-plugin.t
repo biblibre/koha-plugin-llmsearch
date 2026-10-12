@@ -17,7 +17,6 @@
 
 use Modern::Perl;
 use Test::More;
-use Test::Exception;
 
 my $lib = $ENV{PLUGIN_LIB} || File::Spec->catdir(File::Spec->curdir, '..');
 

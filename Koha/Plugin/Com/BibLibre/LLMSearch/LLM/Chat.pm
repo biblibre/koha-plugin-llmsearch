@@ -1,7 +1,6 @@
 package Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Chat;
 
 use Modern::Perl;
-use C4::Context;
 use C4::Auth qw( get_session );
 use JSON qw( encode_json decode_json );
 use LWP::UserAgent;
@@ -10,8 +9,8 @@ use URI::Escape;
 use Encode qw(encode);
 use Koha::Plugin::Com::BibLibre::LLMSearch;
 use Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Prompt;
-use Koha::Plugin::Com::BibLibre::LLMSearch::Search::Tools;
-use Koha::Plugin::Com::BibLibre::LLMSearch::Stats::Logger;
+use Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Tools;
+use Koha::Plugin::Com::BibLibre::LLMSearch::Logger;
 
 =head1 NAME
 
@@ -32,7 +31,7 @@ and executing tools as needed.
 =cut
 
 our $plugin = Koha::Plugin::Com::BibLibre::LLMSearch->new();
-our $tools  = "Koha::Plugin::Com::BibLibre::LLMSearch::Search::Tools";
+our $tools  = "Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Tools";
 
 sub handle_chat_request {
     my ($c) = @_;
@@ -88,7 +87,7 @@ sub handle_chat_request {
     });
 
     # Log the request
-    Koha::Plugin::Com::BibLibre::LLMSearch::Stats::Logger::log_request( { lang => $opac_lang, data => $final_response } );
+    Koha::Plugin::Com::BibLibre::LLMSearch::Logger::log_request( { lang => $opac_lang, data => $final_response } );
     
     return $c->render(
         status  => 200,

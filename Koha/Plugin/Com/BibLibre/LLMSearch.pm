@@ -5,7 +5,6 @@ use Modern::Perl;
 
 ## Required for all plugins
 use base qw(Koha::Plugins::Base);
-use Template;
 use Mojo::JSON qw(decode_json);
 
 use Koha::DateUtils qw( dt_from_string );
@@ -136,7 +135,6 @@ sub is_allowed {
 
 sub opac_js {
     my ( $self ) = @_;
-    warn "is_allowed: " . $self->is_allowed();
     return '' unless $self->is_allowed();
     return '<script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>'
         . '<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>'
@@ -145,7 +143,6 @@ sub opac_js {
 
 sub opac_head {
     my ( $self ) = @_;
-    warn "is_allowed: " . $self->is_allowed();
     return '' unless $self->is_allowed();
     return '<style>' . $self->mbf_read('chat.css') . '</style>';
 }
