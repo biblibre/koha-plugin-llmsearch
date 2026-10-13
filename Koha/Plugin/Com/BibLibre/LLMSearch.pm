@@ -136,7 +136,14 @@ sub is_allowed {
 sub opac_js {
     my ( $self ) = @_;
     return '' unless $self->is_allowed();
-    return '<script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>'
+    # Embed the current borrowernumber so chat.js can detect a user change
+    # (logout/login on the same tab) and clear the stored chat history.
+    my $userenv        = C4::Context->userenv;
+    my $borrowernumber = ( $userenv && $userenv->{'number'} ) ? $userenv->{'number'} : '';
+    return '<script>var llmsearch_borrowernumber = \''
+        . $borrowernumber
+        . '\';</script>'
+        . '<script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>'
         . '<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>'
         . '<script>' . $self->mbf_read('chat.js') . '</script>';
 }

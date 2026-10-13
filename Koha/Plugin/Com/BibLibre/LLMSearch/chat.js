@@ -1,4 +1,13 @@
 $(document).ready(function() {
+    // Clear the chat history when the logged-in user changes (logout then
+    // login on the same tab): sessionStorage survives a logout, so without
+    // this check another user could read the previous user's conversation.
+    var current_user = window.llmsearch_borrowernumber || '';
+    if (sessionStorage.getItem('llmsearch_user') !== current_user) {
+        sessionStorage.removeItem('current_chat');
+        sessionStorage.setItem('llmsearch_user', current_user);
+    }
+
     $('form#searchform div:first').append('<div class="order-6 order-sm-4 col-sm-auto"><button class="btn btn-primary" type="button" onclick="openForm()" title="AI Chat" aria-label="AI Chat"><i class="fa-solid fa-robot"></i></button></div>');
     
     fetch('/api/v1/contrib/llmsearch/static/chat.html')
