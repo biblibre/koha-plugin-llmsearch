@@ -72,14 +72,17 @@ sub upgrade {
     return 1;
 }
 
+sub default_welcome {
+    return "Hello! I am the library bot and I'll do my best to assist you in your research!";
+}
+
 sub configure {
     my ( $self, $args ) = @_;
     my $cgi = $self->{'cgi'};
-    my $default_welcome = "Hello! I am the library bot and I'll do my best to assist you in your research!";
-    my $defaults = { base_url                 => 'https://api.mistral.ai/v1/chat/completions',
-                     api_key                  => '',
-                     model                    => 'mistral-small-latest',
-                     welcome                  => $default_welcome,
+    # The LLM connection options (api_key, model, base_url) are stored in
+    # config.ini (JSON format) in the plugin directory, edited by the system
+    # administrator: they are neither displayed nor saved from this page.
+    my $defaults = { welcome                  => default_welcome(),
                      system_prompt            => '',
                      is_public                => 0,
                      allowed_cat              => '',

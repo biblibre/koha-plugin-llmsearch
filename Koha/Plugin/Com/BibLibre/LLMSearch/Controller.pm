@@ -9,7 +9,7 @@ our $plugin = Koha::Plugin::Com::BibLibre::LLMSearch->new();
 
 sub welcome {
     my $c = shift->openapi->valid_input or return;
-    my $welcome_msg = $plugin->retrieve_data('welcome');
+    my $welcome_msg = $plugin->retrieve_data('welcome') || $plugin->default_welcome();
     utf8::encode($welcome_msg) if defined $welcome_msg;
     return $c->render(
         status  => 200,

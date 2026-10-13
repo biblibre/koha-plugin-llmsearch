@@ -1,0 +1,5 @@
+{
+    "api_key": "",
+    "model": "mistral-small-latest",
+    "base_url": "https://api.mistral.ai/v1/chat/completions"
+}

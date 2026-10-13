@@ -15,9 +15,11 @@
         <input type="hidden" name="class" value="[% CLASS %]"/>
         <input type="hidden" name="method" value="[% METHOD %]"/>
 	[% INCLUDE 'csrf-token.inc' %]
-	<div>
-            <label for="api_key">LLM API Key</label>
-	    <input type="text" name="api_key" value="[% api_key %]"/>
+	<div class="hint" style="margin:.5em 0;">
+	    <strong>LLM connection settings</strong> (API key, model and base URL) are stored in
+	    <code>config.ini</code> in the plugin directory. They are edited by the system
+	    administrator on the server (see <code>config.ini-example</code>) and are never
+	    displayed on this page.
 	</div>
 	<div>
 	    <label for="welcome">Welcome message</label>
@@ -43,14 +45,6 @@
 	        <textarea name="system_prompt" rows="20" cols="80">[% system_prompt %]</textarea>
 	    </div>
 	</details>
-	<div>
-            <label for="model">Model to use</label>
-	    <input type="text" name="model" value="[% model %]"/>
-	</div>
-	<div>
-	    <label for="base_url">Base URL</label>
-	    <input type="text" name="base_url" value="[% base_url %]"/>
-	</div>
 	<div>
 	    <label for="is_public">allow anonymous users (always available)</label>
 	    <input type="checkbox" name="is_public" [% IF ( is_public ) %]checked="checked"[% END %]/>

@@ -15,12 +15,25 @@ If you want to use another platform, you will need to provide the base url of yo
 Those are kind "Expert-mode" configuration.
 
 ## Configuration
-The only mandatory configuration option is the API Key which you will need to obtain from an LLM provider.
-I used Mistral which I found was a very qualitative and rather cheap offer.
-You can leave all other fields empty and save.
-Default model is mistral-small-latest and Base URL is also automatically filled-in with Mistral api endpoint.
+The LLM connection options (API key, model and base URL) are stored in a `config.ini` file (JSON format) in the plugin directory.
+Copy `config.ini-example` to `config.ini` and fill in your values:
 
-If you want to use another service (for example Ollama) you'll have to fill in the proper values in the respective fields.
+    {
+        "api_key": "your-api-key",
+        "model": "mistral-small-latest",
+        "base_url": "https://api.mistral.ai/v1/chat/completions"
+    }
+
+The file is gitignored: the API key stays on the server and is never displayed in the plugin configuration page.
+Those options are meant to be edited by the system administrator on the server, not from the Koha interface.
+
+The only mandatory option is the API Key which you will need to obtain from an LLM provider.
+I used Mistral which I found was a very qualitative and rather cheap offer.
+The default model is mistral-small-latest and the default base URL is the Mistral api endpoint.
+
+If you want to use another service (for example Ollama) you'll have to fill in the proper values in `config.ini`.
+
+All other options (welcome message, system prompt, access restrictions, statistics) are configured from the plugin configuration page in Koha.
 
 There is a default system prompt provided which will help Koha creates a search URL but you could as well customize the prompt to make it reply to any other requests such as library opening hours or give the assistant some knowledge about your circulation rules.
 

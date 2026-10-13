@@ -29,6 +29,7 @@ use Koha::Plugin::Com::BibLibre::LLMSearch::Search;
 use Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Prompt;
 use Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Chat;
 use Koha::Plugin::Com::BibLibre::LLMSearch::Controller;
+use C4::Context;
 
 # 1. Test Search module (CCL) - escape_value
 is(
@@ -200,6 +201,7 @@ ok(1, 'LLM::Chat module loads successfully');
 ok(Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Chat->can('handle_chat_request'), 'Chat::handle_chat_request exists');
 ok(Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Chat->can('execute_chat_loop'), 'Chat::execute_chat_loop exists');
 ok(Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Chat->can('execute_tool_calls'), 'Chat::execute_tool_calls exists');
+ok(Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Chat->can('get_llm_config'), 'Chat::get_llm_config exists');
 
 # Test execute_tool_calls with a mock choice containing tool calls
 # This is a basic test to ensure the function doesn't crash
@@ -334,5 +336,65 @@ is($log_result, 1, 'Logger::log_request handles undef data');
 # Test log_request with missing usage in data
 $log_result = Koha::Plugin::Com::BibLibre::LLMSearch::Logger::log_request({ lang => 'fr', data => {} });
 is($log_result, 1, 'Logger::log_request handles missing usage data');
+
+# 14. Test Chat::get_llm_config (config.ini, JSON format)
+my $config_file = $plugin->bundle_path() . '/config.ini';
+like($config_file, qr{Koha/Plugin/Com/BibLibre/LLMSearch/config\.ini$}, 'config.ini is in the plugin directory');
+
+# get_llm_config returns undef when neither the file nor the database has the key
+is(
+    Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Chat::get_llm_config('nonexistent_key_12345'),
+    undef,
+    'Chat::get_llm_config returns undef for unknown key'
+);
+
+# Back up any existing config.ini so the test can restore it afterwards
+my $original_config;
+if (-e $config_file) {
+    open my $in, '<', $config_file or BAIL_OUT("Cannot read $config_file: $!");
+    $original_config = do { local $/; <$in> };
+    close $in;
+}
+
+# Write a test config.ini and check that get_llm_config reads it
+open my $fh, '>', $config_file or BAIL_OUT("Cannot write $config_file: $!");
+print {$fh} '{
+    "api_key": "test-api-key",
+    "model": "test-model",
+    "base_url": "https://example.com/v1/chat/completions",
+    "llmsearch_test": "file-value"
+}
+';
+close $fh;
+
+is(Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Chat::get_llm_config('api_key'), 'test-api-key', 'Chat::get_llm_config reads api_key from config.ini');
+is(Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Chat::get_llm_config('model'), 'test-model', 'Chat::get_llm_config reads model from config.ini');
+is(Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Chat::get_llm_config('base_url'), 'https://example.com/v1/chat/completions', 'Chat::get_llm_config reads base_url from config.ini');
+
+# The file takes precedence over the database, which remains as a fallback
+$plugin->store_data({ llmsearch_test => 'db-value', llmsearch_test_db_only => 'db-only-value' });
+is(Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Chat::get_llm_config('llmsearch_test'), 'file-value', 'File value takes precedence over database value');
+is(Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Chat::get_llm_config('llmsearch_test_db_only'), 'db-only-value', 'Chat::get_llm_config falls back to the database');
+
+# Invalid JSON falls back to the database instead of dying
+open $fh, '>', $config_file or BAIL_OUT("Cannot write $config_file: $!");
+print {$fh} 'this is not json';
+close $fh;
+is(Koha::Plugin::Com::BibLibre::LLMSearch::LLM::Chat::get_llm_config('llmsearch_test'), 'db-value', 'Invalid JSON in config.ini falls back to the database');
+
+# Cleanup: restore the original config.ini (or remove the test file) and
+# remove the test rows from the database
+if (defined $original_config) {
+    open my $out, '>', $config_file or BAIL_OUT("Cannot write $config_file: $!");
+    print {$out} $original_config;
+    close $out;
+    ok(-e $config_file, 'Original config.ini restored');
+}
+else {
+    unlink $config_file;
+    ok(!-e $config_file, 'config.ini test file removed');
+}
+C4::Context->dbh->do("DELETE FROM plugin_data WHERE plugin_class = ? AND plugin_key IN ('llmsearch_test', 'llmsearch_test_db_only')", undef, 'Koha::Plugin::Com::BibLibre::LLMSearch');
+is($plugin->retrieve_data('llmsearch_test'), undef, 'Test rows removed from the database');
 
 done_testing();

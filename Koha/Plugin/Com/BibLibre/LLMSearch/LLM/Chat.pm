@@ -116,8 +116,8 @@ sub execute_chat_loop {
     my $nudged         = 0;
     my $current_round  = 1;
 
-    my $base_url = $plugin->retrieve_data('base_url');
-    my $model    = $plugin->retrieve_data('model');
+    my $base_url = get_llm_config('base_url');
+    my $model    = get_llm_config('model');
     return "missing configuration"
 	unless $base_url and $model;
 
@@ -269,6 +269,25 @@ sub execute_tool_calls {
     return 0;
 }
 
+=head2 get_llm_config
+
+Returns the value of the given key from the plugin's config.ini file (JSON
+format), read with mbf_read. Falls back to the database for values stored
+by previous versions.
+
+=cut
+
+sub get_llm_config {
+    my ( $key ) = @_;
+    if ( $plugin->mbf_exists('config.ini') ) {
+        my $config = eval { decode_json( $plugin->mbf_read('config.ini') ) };
+        warn "LLMSearch: could not read config.ini as JSON: $@" if $@;
+        return $config->{$key} if ref $config eq 'HASH' and exists $config->{$key};
+    }
+    # Fall back to the database for values stored by previous versions
+    return $plugin->retrieve_data($key);
+}
+
 =head2 call
 
 Sends a request to the LLM API and returns the HTTP::Response object.
@@ -277,8 +296,8 @@ Sends a request to the LLM API and returns the HTTP::Response object.
 
 sub api_call {
     my ( $payload ) = @_;
-    my $api_key  = $plugin->retrieve_data('api_key');
-    my $base_url = $plugin->retrieve_data('base_url');
+    my $api_key  = get_llm_config('api_key');
+    my $base_url = get_llm_config('base_url');
     my $header = [
         'Content-Type'  => 'application/json',
         'Accept'        => 'application/json',
